@@ -232,3 +232,11 @@ LEASH needs a jury that can read **natural-language mandates** and messy receipt
 ---
 
 Built for the **GenLayer Agent Tank Hackathon**.
+
+<!-- DEPLOYED_ADDRESSES_START -->
+## Deployed Addresses
+
+| Network | Chain ID | Contract | Address | Timestamp |
+| --- | ---: | --- | --- | --- |
+| hardhat | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-05T14:12:26.233Z |
+<!-- DEPLOYED_ADDRESSES_END -->

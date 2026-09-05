@@ -29,8 +29,15 @@ module.exports = {
       url: "http://127.0.0.1:8545",
     },
     genlayer_studio: {
-      url: "http://127.0.0.1:8545",
+      url: "https://studio.genlayer.com/api",
       chainId: 61999,
+      accounts: accountsFromEnv(),
+      gas: 8_000_000,
+      gasPrice: 0,
+    },
+    genlayer_bradbury: {
+      url: "https://rpc.testnet-chain.genlayer.com",
+      chainId: 4221,
       accounts: accountsFromEnv(),
     },
   },
