@@ -205,6 +205,40 @@ Network used by the cases:
 | Chain ID | `61999` |
 | RPC | `http://127.0.0.1:8545` |
 
+### Interactive CLI — arbitrary amounts & custom mandates
+
+Anyone can drive LEASH with a **custom mandate** and **completely arbitrary numbers**. The script deploys a **fresh** LEASH instance, registers an agent with your mandate and spend cap, then Continue-or-Revoke based on whether the requested spend fits the cap.
+
+```bash
+npx hardhat run studio_cases/interactive_test.js
+```
+
+You will be prompted in the terminal:
+
+1. `Enter custom mandate (e.g. 'Rent AI GPU cluster for 1 month'):`
+2. `Enter total spend cap in USD (e.g. 5000):`
+3. `Enter agent action description (e.g. 'Booked 8x H100 instances'):`
+4. `Enter next spend amount requested in USD (e.g. 3200):`
+
+| Condition | Jury | What happens on-chain |
+| --- | --- | --- |
+| `nextSpend <= spendCap` | **Continue** | Spend is approved, deducted from the cap, remaining allowance is printed |
+| `nextSpend > spendCap` | **Revoke** | ERC-7710 kill switch fires, the agent is frozen, further txs revert `AgentPaused` |
+
+The CLI prints a formatted summary of the live on-chain state (agent id, remaining cap, `canProceed`, kill-switch flag).
+
+Same command via npm:
+
+```bash
+npm run studio:interactive
+```
+
+Optional: run against GenLayer Studio instead of the in-process Hardhat network:
+
+```bash
+npx hardhat run studio_cases/interactive_test.js --network genlayer_studio
+```
+
 ---
 
 ## Repository
@@ -221,7 +255,8 @@ LEASH-Protocol/
 ├── studio_cases/
 │   ├── 1_in_mandate.js                      # Continue
 │   ├── 2_soft_drift.js                      # Warn
-│   └── 3_overspend.js                       # Revoke
+│   ├── 3_overspend.js                       # Revoke
+│   └── interactive_test.js                  # interactive CLI: arbitrary mandate + amounts
 ├── test/LEASH.test.js
 └── hardhat.config.js                        # genlayer_studio @ 61999
 ```

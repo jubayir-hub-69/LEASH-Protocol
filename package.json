@@ -12,6 +12,7 @@
     "studio:1": "hardhat run studio_cases/1_in_mandate.js --network genlayer_studio",
     "studio:2": "hardhat run studio_cases/2_soft_drift.js --network genlayer_studio",
     "studio:3": "hardhat run studio_cases/3_overspend.js --network genlayer_studio",
+    "studio:interactive": "hardhat run studio_cases/interactive_test.js",
     "node": "hardhat node"
   },
   "devDependencies": {
