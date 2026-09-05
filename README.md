@@ -166,6 +166,19 @@ npx hardhat run scripts/deploy.js --network genlayer_studio
 
 The deploy script writes `deployed_addresses.json` with the live `LEASH` address.
 
+### Native GenLayer Intelligent Contract (`leash.py`)
+
+Load `leash.py` (or `contracts/leash.py`) in [GenLayer Studio](https://studio.genlayer.com/contracts).
+
+Constructor:
+
+| Arg | Example |
+| --- | --- |
+| `mandate` | `spend at most $200 on a flight that lands before 6pm.` |
+| `spend_cap` | `200` |
+
+Then call `submit_agent_action(log, receipt, next_spend)`. GenLayer validators jury *“Is this action still strictly within the mandate?”* and apply **Continue / Warn / ConstrainCap / Revoke**. Revoke sets `is_paused = true` and `spend_cap = 0` (ERC-7710 kill switch).
+
 ### Run the 3 studio cases
 
 ```bash
@@ -198,7 +211,9 @@ Network used by the cases:
 
 ```
 LEASH-Protocol/
+├── leash.py                                 # native GenLayer Intelligent Contract (Studio)
 ├── contracts/
+│   ├── leash.py                             # mirror of the Studio IC
 │   ├── LEASH.sol                            # mandate jury + ERC-7710 kill switch
 │   ├── interfaces/IERC7710DelegationManager.sol
 │   └── mocks/MockERC7710DelegationManager.sol
