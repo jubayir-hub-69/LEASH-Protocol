@@ -8,6 +8,10 @@
     "test": "hardhat test",
     "deploy": "hardhat run scripts/deploy.js",
     "deploy:localhost": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:studio": "hardhat run scripts/deploy.js --network genlayer_studio",
+    "studio:1": "hardhat run studio_cases/1_in_mandate.js --network genlayer_studio",
+    "studio:2": "hardhat run studio_cases/2_soft_drift.js --network genlayer_studio",
+    "studio:3": "hardhat run studio_cases/3_overspend.js --network genlayer_studio",
     "node": "hardhat node"
   },
   "devDependencies": {

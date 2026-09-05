@@ -28,9 +28,9 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545",
     },
-    genlayer_bradbury: {
-      url: "https://rpc-bradbury.genlayer.com",
-      chainId: 4221,
+    genlayer_studio: {
+      url: "http://127.0.0.1:8545",
+      chainId: 61999,
       accounts: accountsFromEnv(),
     },
   },
