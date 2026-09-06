@@ -78,26 +78,106 @@ This is a **live jury on a mandate**, not a vault.
 
 ---
 
-## The 4 Verdicts
+## The 5 Verdicts
 
 The jury does not score a contest. It scores *mandate fidelity*.
 
 | Verdict | Meaning | What happens on-chain |
 | :---: | --- | --- |
 | **Continue** | Still the job | Next spend is approved (clamped to remaining cap). Gate opens. |
-| **Warn** | Soft drift | Spend may proceed, but `warningCount` increments. Deviation is on the record. |
+| **Warn** | Soft drift | Spend may proceed. A **threat score** accrues (severity points; default 1). Crossing `threatThreshold` (default 10) fires the kill switch. |
 | **Constrain Cap** | Budget / scope tightening | `spendCap` is cut. Next spend is clamped to the new cap. |
 | **Revoke** | Kill switch | Agent is **paused**, cap is zeroed, `disableDelegation(hash)` is called on the ERC-7710 manager. Further submits revert `AgentPaused`. |
+| **Unlock Milestone** | Milestone proven | A registered milestone is marked complete and `spendCap` **increases** by its `capIncrease`. |
+
+---
+
+## Batch 1 — Production Controls
+
+### 1. Human Override & Appeal
+
+The owner can bypass the AI jury without waiting for a verdict.
+
+| Function | Who | Effect |
+| --- | --- | --- |
+| `emergencyFreeze(agentId)` | Owner | Instantly **pauses** the agent, **zeros the cap**, and disables the ERC-7710 delegation. Works even while `awaitingVerdict` is true. |
+| `appealAndUnfreeze(agentId, newCap)` | Owner | Restores operations: unpauses the agent and sets a new spend cap. If the mandate window has already closed, a 7-day deadline is granted so the agent can actually run again. |
+
+A frozen agent cannot `submitAction` (`AgentPaused`). After a successful appeal the agent may post again and the jury resumes as normal.
+
+GenLayer native equivalents: `emergency_freeze()` / `appeal_and_unfreeze(new_cap)` (deployer is owner).
+
+### 2. Time-Bound Mandate
+
+Every agent carries a `deadline` (unix timestamp) on its mandate. Pass `0` at registration to bind the deadline to `expiresAt`.
+
+**Any action submitted after this deadline automatically:**
+
+1. Rejects the action (no spendable submission is recorded)
+2. Fires the **kill switch** — pause, zero cap, disable ERC-7710
+3. Causes follow-up `submitAction` calls to revert `AgentPaused`
+
+`canProceed` returns `deadline exceeded` (or `revoked` once the switch has fired). A late jury vote is coerced to Revoke rather than Continue. Anyone may call `enforceDeadline(agentId)` to persist the switch if the agent never submits.
+
+GenLayer native: constructor arg `deadline` (unix seconds; `0` = no time bound). `submit_agent_action` after the deadline returns a paused/zero-cap snapshot and later calls revert `AgentPaused`.
+
+---
+
+## Batch 2 — Production Security
+
+### 3. Milestone-Based Cap Unlocking
+
+The principal (or owner) pre-registers named milestones. The jury can only raise `spendCap` by verifying one of those milestones — it cannot mint arbitrary allowance.
+
+| Function | Who | Effect |
+| --- | --- | --- |
+| `addMilestone(agentId, description, capIncrease)` | Principal / owner | Registers a 1-based milestone. `capIncrease` must be > 0. |
+| `castVerdict(..., UnlockMilestone, milestoneId, reason)` | Jury / relayer | If the milestone exists and is open, `spendCap += capIncrease` and the milestone is marked complete. Re-unlock reverts `MilestoneAlreadyCompleted`. |
+
+GenLayer native: `add_milestone(description, cap_increase)` then a jury `UnlockMilestone` with `milestone_id`.
+
+### 4. Strict Destination Whitelisting
+
+The Intelligent Contract **extracts** a 20-byte destination from the agent's logs/receipts (`to:`, `destination:`, `recipient:` tags win; 64-nibble tx hashes are ignored). The EVM gate then refuses any spend that is not that approved destination.
+
+Once **at least one** destination is allowlisted, the restriction is mandatory:
+
+1. `submitAction` reverts `DestinationRequired` if no destination can be resolved
+2. It reverts `DestinationNotAllowed` if the destination is not on the list
+3. It reverts `DestinationMismatch` if logs/receipts disagree with `nextTarget`
+4. After a non-Revoke verdict, `approvedDestination` is bound
+5. Wallets call `canProceedTo(agentId, amount, destination)`. `reportSpendExecuted` checks the same gate
+
+| Function | Role |
+| --- | --- |
+| `addAllowedDestination` / `removeAllowedDestination` | Principal / owner manage the allowlist |
+| `extractDestination(logs, receipts)` | Pure on-chain parser (tagged 20-byte address) |
+| `canProceedTo(agentId, amount, destination)` | Caveat-enforcer gate |
+
+An empty allowlist keeps existing open-destination behaviour (backward compatible).
+
+### 5. Dynamic Threat Scoring
+
+`warningCount` is retained as a tally. The live control is `threatScore`.
+
+- Each **Warn** adds severity points (`newCap` in `castVerdict`; `0` means **1** point)
+- Default `threatThreshold` is **10** (owner may `setThreatThreshold`)
+- When `threatScore >= threatThreshold` the kill switch fires automatically (pause, zero cap, disable ERC-7710)
+- `appealAndUnfreeze` / `reinstateAgent` reset the score so a restored agent starts clean
 
 ```mermaid
 flowchart LR
-  A[Agent posts packet] --> J{GenLayer jury}
+  A[Agent posts packet] --> D{Destination gate}
+  D -->|fail| X[Revert — funds cannot leave]
+  D -->|pass| J{GenLayer jury}
   J -->|Continue| C[Unlock next spend]
-  J -->|Warn| W[Unlock + flag drift]
+  J -->|UnlockMilestone| U[Raise spendCap]
+  J -->|Warn| W[Add threat points]
+  W -->|score >= threshold| R[Kill switch]
   J -->|ConstrainCap| K[Cut remaining cap]
-  J -->|Revoke| R[Pause agent + revoke ERC-7710]
-  C --> Wallets[Wallet / caveat enforcer: canProceed]
-  W --> Wallets
+  J -->|Revoke| R
+  C --> Wallets[Wallet / caveat enforcer: canProceedTo]
+  U --> Wallets
   K --> Wallets
   R --> Dead[Second tx never leaves]
 ```
@@ -176,6 +256,7 @@ Constructor:
 | --- | --- |
 | `mandate` | `spend at most $200 on a flight that lands before 6pm.` |
 | `spend_cap` | `200` |
+| `deadline` | unix seconds, or `0` for no time bound |
 
 Then call `submit_agent_action(log, receipt, next_spend)`. GenLayer validators jury *“Is this action still strictly within the mandate?”* and apply **Continue / Warn / ConstrainCap / Revoke**. Revoke sets `is_paused = true` and `spend_cap = 0` (ERC-7710 kill switch).
 
@@ -251,7 +332,8 @@ LEASH-Protocol/
 │   ├── LEASH.sol                            # mandate jury + ERC-7710 kill switch
 │   ├── interfaces/IERC7710DelegationManager.sol
 │   └── mocks/MockERC7710DelegationManager.sol
-├── scripts/deploy.js                        # deploy + write deployed_addresses.json
+├── scripts/deploy.js                        # deploy LEASH.sol + write deployed_addresses.json
+├── scripts/deploy_leash_py.mjs              # deploy leash.py to GenLayer Studio
 ├── studio_cases/
 │   ├── 1_in_mandate.js                      # Continue
 │   ├── 2_soft_drift.js                      # Warn
@@ -265,11 +347,17 @@ LEASH-Protocol/
 
 | Function | Role |
 | --- | --- |
-| `registerAgent` | Principal enrolls an agent that already holds keys |
-| `submitAction` | Agent posts mandate, logs, receipts, next spend |
-| `castVerdict` / `submitConsensusVerdict` | GenLayer jury |
-| `canProceed` | Wallet / ERC-7710 caveat enforcer gate |
-| `reportSpendExecuted` | Clears the green light; agent must submit again |
+| `registerAgent` | Principal enrolls an agent that already holds keys (includes mandate `deadline`) |
+| `submitAction` | Agent posts mandate, logs, receipts, next spend. After `deadline`, auto-fires the kill switch |
+| `emergencyFreeze` | Owner bypass: pause + zero cap + ERC-7710 disable |
+| `appealAndUnfreeze` | Owner appeal: restore cap and unpause |
+| `enforceDeadline` | Permissionless keeper: persist the kill switch after `deadline` |
+| `castVerdict` / `submitConsensusVerdict` | GenLayer jury (Continue / Warn / ConstrainCap / UnlockMilestone / Revoke) |
+| `addMilestone` | Register a cap-unlock milestone |
+| `addAllowedDestination` | Strict spend destination allowlist |
+| `canProceed` / `canProceedTo` | Wallet / ERC-7710 caveat enforcer gate (destination-aware) |
+| `reportSpendExecuted` | Clears the green light; destination must match the approved target |
+| `setThreatThreshold` | Owner configures the kill-switch threat score (default 10) |
 
 ---
 
@@ -277,7 +365,7 @@ LEASH-Protocol/
 
 LEASH needs a jury that can read **natural-language mandates** and messy receipts — not a deterministic price oracle. GenLayer validators are that jury. They reach consensus on a subjective question (*is this still the job?*) and LEASH enforces the answer on an ERC-7710 delegation **before** the next spend is signed.
 
-**Continue. Warn. Constrain the cap. Or pull the leash.**
+**Continue. Unlock a milestone. Warn (and score the threat). Constrain the cap. Or pull the leash.**
 
 ---
 
@@ -288,5 +376,17 @@ Built for the **GenLayer Agent Tank Hackathon**.
 
 | Network | Chain ID | Contract | Address | Timestamp |
 | --- | ---: | --- | --- | --- |
-| hardhat | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-05T14:12:26.233Z |
+| hardhat | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-06T05:24:23.481Z |
 <!-- DEPLOYED_ADDRESSES_END -->
+
+### GenLayer Studio Intelligent Contract (`leash.py`)
+
+Live on Studionet (chain ID `61999`). Constructor: mandate `$200 / lands before 6pm`, spend cap `200`, deadline `0` (no time bound until set). Batch 2 live: `threat_threshold = 10`, empty milestone list, open destination allowlist until `add_allowed_destination` is called.
+
+| Network | Chain ID | Contract | Address | Deploy tx |
+| --- | ---: | --- | --- | --- |
+| genlayer_studio | 61999 | leash.py | `0x3bba2d2d84a95006084aFabc0F02a6dE472D57A4` | [`0x91e06782…06d997`](https://studio.genlayer.com/contracts) |
+
+```bash
+node scripts/deploy_leash_py.mjs
+```

@@ -202,6 +202,7 @@ async function registerCustomAgent(leash, mockManager, deployer, mandate, spendC
     ethers.id(mandate),
     spendCapWei,
     expiresAt,
+    expiresAt,
     delegationHash,
     managerAddress,
     overrides

@@ -129,6 +129,16 @@ async function main() {
   await setRelayerTx.wait();
 
   const timestamp = new Date().toISOString();
+  const existing = (() => {
+    try {
+      return JSON.parse(
+        fs.readFileSync(path.join(__dirname, "..", "deployed_addresses.json"), "utf8")
+      );
+    } catch {
+      return {};
+    }
+  })();
+
   const deployedAddresses = {
     network: hre.network.name,
     chainId: Number(network.chainId),
@@ -137,9 +147,20 @@ async function main() {
     deployer: deployer.address,
     MockERC7710DelegationManager: mockManagerAddress,
     verdictThreshold,
+    threatThreshold: 10,
     timestamp,
     deployedAt: timestamp,
+    features: [
+      "emergencyFreeze / appealAndUnfreeze (owner bypass of the AI jury)",
+      "time-bound mandate deadline with automatic kill switch",
+      "milestone-based spendCap unlocking (UnlockMilestone verdict)",
+      "strict destination allowlist + on-chain receipt extraction",
+      "dynamic threat score; kill switch at threatThreshold (default 10)",
+    ],
   };
+  if (existing.genlayerStudio) {
+    deployedAddresses.genlayerStudio = existing.genlayerStudio;
+  }
 
   writeDeployedAddresses(deployedAddresses);
   updateReadme(deployedAddresses);

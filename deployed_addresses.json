@@ -1,9 +1,44 @@
 {
   "network": "hardhat",
   "chainId": 31337,
-  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "contractAddress": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
   "LEASH": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   "MockERC7710DelegationManager": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "verdictThreshold": 1,
-  "deployedAt": "2026-09-05T17:33:13.894Z"
+  "threatThreshold": 10,
+  "timestamp": "2026-09-06T05:24:23.481Z",
+  "deployedAt": "2026-09-06T05:24:23.481Z",
+  "features": [
+    "emergencyFreeze / appealAndUnfreeze (owner bypass of the AI jury)",
+    "time-bound mandate deadline with automatic kill switch",
+    "milestone-based spendCap unlocking (UnlockMilestone verdict)",
+    "strict destination allowlist + on-chain receipt extraction",
+    "dynamic threat score; kill switch at threatThreshold (default 10)"
+  ],
+  "genlayerStudio": {
+    "network": "genlayer_studio",
+    "chainId": 61999,
+    "rpc": "https://studio.genlayer.com/api",
+    "deployer": "0x63dD8aD2b467c98319bea9237fAAFFd2cA769662",
+    "contract": "leash.py",
+    "leashPy": "0x3bba2d2d84a95006084aFabc0F02a6dE472D57A4",
+    "deployTx": "0x91e06782a1662b7b26b5119a2740a147a1795b3568f25754c7866551ec06d997",
+    "constructorArgs": {
+      "mandate": "spend at most $200 on a flight that lands before 6pm.",
+      "spendCap": 200,
+      "deadline": 0
+    },
+    "status": "FINALIZED",
+    "result": "MAJORITY_AGREE",
+    "sourceMatch": "leash.py == contracts/leash.py == Studio bytecode source",
+    "verifiedState": {
+      "spend_cap": "200.0",
+      "threat_score": 0,
+      "threat_threshold": 10,
+      "milestone_count": "0",
+      "can_proceed": true
+    },
+    "deployedAt": "2026-09-06T05:32:59.248Z"
+  }
 }

@@ -14,9 +14,10 @@ const Verdict = {
   Warn: 1,
   ConstrainCap: 2,
   Revoke: 3,
+  UnlockMilestone: 4,
 };
 
-const VERDICT_NAME = ["Continue", "Warn", "ConstrainCap", "Revoke"];
+const VERDICT_NAME = ["Continue", "Warn", "ConstrainCap", "Revoke", "UnlockMilestone"];
 
 const ADDRESSES_PATH = path.join(__dirname, "..", "deployed_addresses.json");
 
@@ -104,6 +105,7 @@ async function setupCase(caseId) {
     MANDATE,
     ethers.id(MANDATE),
     USD(200),
+    expiresAt,
     expiresAt,
     delegationHash,
     managerAddress
