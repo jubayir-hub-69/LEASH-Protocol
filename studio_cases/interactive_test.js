@@ -415,7 +415,7 @@ async function main() {
 
     const spendTx = await leash
       .connect(agentWallet)
-      .reportSpendExecuted(agentId, nextSpendWei, txOverrides());
+      ["reportSpendExecuted(uint256,uint256)"](agentId, nextSpendWei, txOverrides());
     await spendTx.wait();
 
     const afterSpend = await leash.getAgent(agentId);
