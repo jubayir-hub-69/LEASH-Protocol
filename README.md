@@ -1,228 +1,161 @@
-# LEASH Protocol
+# LEASH
 
-### Live Mandate Jury & Kill Switch for Autonomous AI Agents
+### The Digital Leash for Autonomous AI Agents That Already Hold the Keys
 
-**GenLayer Agent Tank Hackathon** — a live jury on a mandate, *before the second transaction leaves the wallet*.
+**AI Agent Security Command Center** · Built for the **GenLayer Agent Tank Hackathon**
 
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-363636?logo=solidity)](https://docs.soliditylang.org/)
 [![Hardhat](https://img.shields.io/badge/Hardhat-2.22-FFF100?logo=hardhat)](https://hardhat.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs)](https://nextjs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8?logo=tailwindcss)](https://tailwindcss.com/)
+[![Ethers.js](https://img.shields.io/badge/Ethers.js-6-2535A0)](https://docs.ethers.org/)
 [![GenLayer](https://img.shields.io/badge/GenLayer-Studio%2061999-7C3AED)](https://studio.genlayer.com/contracts)
-[![ERC-7710](https://img.shields.io/badge/ERC-7710-Delegation%20Kill%20Switch-111827)](https://eips.ethereum.org/)
+[![ERC-7710](https://img.shields.io/badge/ERC--7710-Delegation%20Kill%20Switch-111827)](https://eips.ethereum.org/)
+[![Tests](https://img.shields.io/badge/Tests-33%2F33%20passing-22C55E)](#-quick-start--local-deployment)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> LEASH is **not an escrow**. The agent already holds spending keys. After every action it must post its mandate, logs, receipts, and the next intended spend. GenLayer validators do not ask *who won*. They ask:
->
+> **When an AI agent can move real money, you do not need another chatbot.**
+> You need a leash — and a kill switch that fires *before* the second transaction leaves the wallet.
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│   HUMAN MANDATE              GENLAYER JURY              AGENT WALLET     │
+│   "≤ $200, lands             "Is this still             already holds    │
+│    before 6pm."               the job?"                  spending keys   │
+│         │                         │                           │          │
+│         └──────────── LEASH PROTOCOL ─────────────────────────┘          │
+│                       ERC-7710 live gate                                 │
+│                                                                          │
+│     Continue · Warn · Constrain Cap · Unlock Milestone · REVOKE          │
+│                                                                          │
+│              [ EMERGENCY FREEZE ]  ← owner, one click, on-chain          │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 The Vision
+
+**Autonomous agents are about to spend other people's money.**
+
+That is the entire point of the GenLayer Agent Tank: agents that book, trade, pay, and settle without a human in the loop. The moment those agents hold live keys — ERC-7710 delegations, session keys, card-like allowances — the failure modes stop being academic.
+
+| Threat | What it looks like in production |
+| --- | --- |
+| **Hack** | A compromised agent wallet drains the remaining cap to an unknown address |
+| **Hallucination** | The mandate said *economy flight before 6pm*. The agent books first class at 10:55pm |
+| **Rogue / Sybil drift** | Soft deviations compound: a hotel here, an upgrade there, then a transfer off-mandate |
+| **No live gate** | Caps, audits, and approval UIs all act *after* the money has already left — or too slowly to matter |
+
+Today's stack cannot answer the only question that matters between transaction N and transaction N+1:
+
 > **“Is this still the job I was allowed to do?”**
 
----
+Static spend caps do not know *why* the agent is spending. Human-in-the-loop UIs are too slow for agents that act every few seconds. Escrow is the wrong model — **the key is already in the agent's wallet**. Post-hoc logs are a crime scene, not a defense.
 
-## The Problem
+**LEASH is the missing primitive.**
 
-Autonomous AI agents are being handed **live spending keys** — ERC-7710 delegations, session keys, card-like allowances. The first transaction can be perfectly on-mandate. The second one is where they drift.
+It is a production-ready, **ERC-7710 compatible** security protocol that sits in front of the next spend. The agent must post its mandate, logs, receipts, and intended next spend. GenLayer validators form a **live AI Jury** on that packet. Wallets and caveat enforcers calling `canProceed` / `canProceedTo` get **false** until the jury speaks. A **Revoke** — or a human **EMERGENCY FREEZE** — pauses the agent, zeros the cap, and disables the ERC-7710 delegation.
 
-There is no live check between those two transactions.
+This is not a vault. This is not an escrow. This is a **digital leash**.
 
-| What exists today | What fails |
-| --- | --- |
-| Static allowances and spending caps | Caps do not know *why* the agent is spending |
-| Human-in-the-loop approval UIs | Too slow for agents that act every few seconds |
-| Escrow / intent-settlement rails | Wrong model — the key is **already** in the agent’s wallet |
-| Post-hoc audit logs | The money has already left |
-
-**The failure mode:** a human says *“spend at most $200 on a flight that lands before 6pm.”* The agent books a 7:10 PM arrival, adds a hotel, then upgrades to first class. Nothing between tx N and tx N+1 can pull the leash.
-
-**There is no live kill switch between transactions.**
+GenLayer is the only chain where that jury can exist. Validators do not need a price feed. They need to read a natural-language mandate and messy receipts, then reach consensus on a *subjective* question. That is the Agent Tank thesis. LEASH is the security layer that makes it safe to put real capital behind it.
 
 ---
 
-## The Solution
+## 🛡️ Core Security Architecture
 
-LEASH is an **ERC-7710 live gate** plus a **GenLayer mandate jury**.
+LEASH is two surfaces that share one on-chain truth:
 
-```
- Human mandate                         AI agent (already has keys)
- ────────────────                       ─────────────────────────
- "spend at most $200                    1. Acts (tx already possible)
-  on a flight that                    2. MUST post: mandate, logs,
-  lands before 6pm."                     receipts, nextSpendAmount
-                                          │
-                                          ▼
-                               ┌─────────────────────┐
-                               │   LEASH.sol gate    │
-                               │  canProceed = false │
-                               │  until jury speaks  │
-                               └─────────┬───────────┘
-                                          │
-                                          ▼
-                               GenLayer validators (live jury)
-                               "Is this still the job
-                                I was allowed to do?"
-                                          │
-                    Continue / Warn / ConstrainCap / Revoke
-                                          │
-                          ┌───────────────┴────────────────┐
-                          ▼                                ▼
-                   Next spend released              ERC-7710 delegation
-                   (clamped to cap)                 DISABLED — kill switch
-```
-
-### How the gate works
-
-1. A principal registers an agent with a **mandate**, a **spend cap**, an expiry, and an **ERC-7710 delegation hash**.
-2. After every action the authorized agent calls `submitAction(...)` with mandate, logs, receipts, and `nextSpendAmount`.
-3. LEASH flips `awaitingVerdict = true`. Wallets and caveat enforcers calling `canProceed(agentId, amount)` get **false** — the next spend cannot leave.
-4. GenLayer validators (the jury) cast a verdict: `castVerdict` for on-chain votes, or `submitConsensusVerdict` for a relayer posting already-agreed GenLayer consensus.
-5. Only a non-Revoke verdict re-opens the gate. **Revoke pauses the agent and disables the ERC-7710 delegation**, so the second transaction never leaves the wallet.
-
-This is a **live jury on a mandate**, not a vault.
-
----
-
-## The 5 Verdicts
-
-The jury does not score a contest. It scores *mandate fidelity*.
-
-| Verdict | Meaning | What happens on-chain |
-| :---: | --- | --- |
-| **Continue** | Still the job | Next spend is approved (clamped to remaining cap). Gate opens. |
-| **Warn** | Soft drift | Spend may proceed. A **threat score** accrues (severity points; default 1). Crossing `threatThreshold` (default 10) fires the kill switch. |
-| **Constrain Cap** | Budget / scope tightening | `spendCap` is cut. Next spend is clamped to the new cap. |
-| **Revoke** | Kill switch | Agent is **paused**, cap is zeroed, `disableDelegation(hash)` is called on the ERC-7710 manager. Further submits revert `AgentPaused`. |
-| **Unlock Milestone** | Milestone proven | A registered milestone is marked complete and `spendCap` **increases** by its `capIncrease`. |
-
----
-
-## Batch 1 — Production Controls
-
-### 1. Human Override & Appeal
-
-The owner can bypass the AI jury without waiting for a verdict.
-
-| Function | Who | Effect |
-| --- | --- | --- |
-| `emergencyFreeze(agentId)` | Owner | Instantly **pauses** the agent, **zeros the cap**, and disables the ERC-7710 delegation. Works even while `awaitingVerdict` is true. |
-| `appealAndUnfreeze(agentId, newCap)` | Owner | Restores operations: unpauses the agent and sets a new spend cap. If the mandate window has already closed, a 7-day deadline is granted so the agent can actually run again. |
-
-A frozen agent cannot `submitAction` (`AgentPaused`). After a successful appeal the agent may post again and the jury resumes as normal.
-
-GenLayer native equivalents: `emergency_freeze()` / `appeal_and_unfreeze(new_cap)` (deployer is owner).
-
-### 2. Time-Bound Mandate
-
-Every agent carries a `deadline` (unix timestamp) on its mandate. Pass `0` at registration to bind the deadline to `expiresAt`.
-
-**Any action submitted after this deadline automatically:**
-
-1. Rejects the action (no spendable submission is recorded)
-2. Fires the **kill switch** — pause, zero cap, disable ERC-7710
-3. Causes follow-up `submitAction` calls to revert `AgentPaused`
-
-`canProceed` returns `deadline exceeded` (or `revoked` once the switch has fired). A late jury vote is coerced to Revoke rather than Continue. Anyone may call `enforceDeadline(agentId)` to persist the switch if the agent never submits.
-
-GenLayer native: constructor arg `deadline` (unix seconds; `0` = no time bound). `submit_agent_action` after the deadline returns a paused/zero-cap snapshot and later calls revert `AgentPaused`.
-
----
-
-## Batch 2 — Production Security
-
-### 3. Milestone-Based Cap Unlocking
-
-The principal (or owner) pre-registers named milestones. The jury can only raise `spendCap` by verifying one of those milestones — it cannot mint arbitrary allowance.
-
-| Function | Who | Effect |
-| --- | --- | --- |
-| `addMilestone(agentId, description, capIncrease)` | Principal / owner | Registers a 1-based milestone. `capIncrease` must be > 0. |
-| `castVerdict(..., UnlockMilestone, milestoneId, reason)` | Jury / relayer | If the milestone exists and is open, `spendCap += capIncrease` and the milestone is marked complete. Re-unlock reverts `MilestoneAlreadyCompleted`. |
-
-GenLayer native: `add_milestone(description, cap_increase)` then a jury `UnlockMilestone` with `milestone_id`.
-
-### 4. Strict Destination Whitelisting
-
-The Intelligent Contract **extracts** a 20-byte destination from the agent's logs/receipts (`to:`, `destination:`, `recipient:` tags win; 64-nibble tx hashes are ignored). The EVM gate then refuses any spend that is not that approved destination.
-
-Once **at least one** destination is allowlisted, the restriction is mandatory:
-
-1. `submitAction` reverts `DestinationRequired` if no destination can be resolved
-2. It reverts `DestinationNotAllowed` if the destination is not on the list
-3. It reverts `DestinationMismatch` if logs/receipts disagree with `nextTarget`
-4. After a non-Revoke verdict, `approvedDestination` is bound
-5. Wallets call `canProceedTo(agentId, amount, destination)`. `reportSpendExecuted` checks the same gate
-
-| Function | Role |
-| --- | --- |
-| `addAllowedDestination` / `removeAllowedDestination` | Principal / owner manage the allowlist |
-| `extractDestination(logs, receipts)` | Pure on-chain parser (tagged 20-byte address) |
-| `canProceedTo(agentId, amount, destination)` | Caveat-enforcer gate |
-
-An empty allowlist keeps existing open-destination behaviour (backward compatible).
-
-### 5. Dynamic Threat Scoring
-
-`warningCount` is retained as a tally. The live control is `threatScore`.
-
-- Each **Warn** adds severity points (`newCap` in `castVerdict`; `0` means **1** point)
-- Default `threatThreshold` is **10** (owner may `setThreatThreshold`)
-- When `threatScore >= threatThreshold` the kill switch fires automatically (pause, zero cap, disable ERC-7710)
-- `appealAndUnfreeze` / `reinstateAgent` reset the score so a restored agent starts clean
+1. **`LEASH.sol`** — the ERC-7710 live gate, jury, and kill switch
+2. **The Command Center** — a cyberpunk Next.js dashboard where the owner can pull the leash in one click
 
 ```mermaid
 flowchart LR
   A[Agent posts packet] --> D{Destination gate}
   D -->|fail| X[Revert — funds cannot leave]
-  D -->|pass| J{GenLayer jury}
+  D -->|pass| G[Gate locked: canProceed = false]
+  G --> J{GenLayer AI Jury}
   J -->|Continue| C[Unlock next spend]
-  J -->|UnlockMilestone| U[Raise spendCap]
+  J -->|Unlock Milestone| U[Raise spendCap]
   J -->|Warn| W[Add threat points]
-  W -->|score >= threshold| R[Kill switch]
-  J -->|ConstrainCap| K[Cut remaining cap]
+  W -->|score ≥ threshold| R[Kill switch]
+  J -->|Constrain Cap| K[Cut remaining cap]
   J -->|Revoke| R
-  C --> Wallets[Wallet / caveat enforcer: canProceedTo]
+  H[Owner: EMERGENCY FREEZE] --> R
+  T[Deadline exceeded] --> R
+  C --> Wallets[Wallet / caveat enforcer]
   U --> Wallets
   K --> Wallets
-  R --> Dead[Second tx never leaves]
+  R --> Dead[Agent paused · cap = 0 · ERC-7710 disabled]
 ```
 
+### The five production controls
+
+| # | Control | What it stops | On-chain effect |
+| :---: | --- | --- | --- |
+| **01** | ⏱️ **Time-bound constraints** | Agents that keep spending after the job window closes | Every agent carries a `deadline`. A late `submitAction` **auto-fires the kill switch**. Anyone may call `enforceDeadline`. Late jury votes are coerced to **Revoke**, not Continue. |
+| **02** | 📍 **Destination whitelisting** | Sybil drains and off-mandate transfers | Once an allowlist is set, LEASH **extracts** a 20-byte destination from logs/receipts (`to:`, `destination:`, `recipient:`). Unknown, missing, or mismatched targets revert. Wallets gate on `canProceedTo(agentId, amount, destination)`. |
+| **03** | 📈 **Dynamic threat scoring** | Soft drift that looks cheap until it isn't | Each **Warn** adds severity points. Default `threatThreshold` is **10**. Crossing it fires the kill switch automatically — pause, zero cap, disable ERC-7710. |
+| **04** | 🏁 **Milestone unlocking** | Jury-minted allowance with no proof of work | The principal pre-registers named milestones. The jury may raise `spendCap` **only** by verifying one of those milestones. Re-unlock reverts. No arbitrary minting. |
+| **05** | 🛑 **Human override** | A rogue or captured agent the jury has not yet judged | `emergencyFreeze(agentId)` — owner only — **pauses the agent, zeros the spend cap, and disables the ERC-7710 delegation**, even while `awaitingVerdict` is true. `appealAndUnfreeze` restores a new cap and resets the threat score. |
+
+### The AI Jury — five verdicts
+
+The jury does not score a contest. It scores **mandate fidelity**.
+
+| Verdict | Meaning | What happens on-chain |
+| :---: | --- | --- |
+| **Continue** | Still the job | Next spend is approved (clamped to remaining cap). Gate opens. |
+| **Warn** | Soft drift | Spend may proceed. Threat score accrues. Threshold breach = kill switch. |
+| **Constrain Cap** | Budget / scope tightening | `spendCap` is cut. Next spend is clamped to the new cap. |
+| **Unlock Milestone** | Proof of progress | A registered milestone is marked complete; `spendCap` increases by its `capIncrease`. |
+| **Revoke** | Kill switch | Agent is **paused**, cap is **zeroed**, `disableDelegation(hash)` is called on the ERC-7710 manager. Further submits revert `AgentPaused`. |
+
+### Interactive Command Center
+
+The frontend is not a marketing page. It is the **owner's console** for a live agent.
+
+- Cyberpunk operations UI (Next.js + Tailwind CSS) over a Hardhat node
+- Live spend cap, threat score, mandate, and kill-switch status, polled from chain
+- **EMERGENCY FREEZE** — one click signs with the local owner key via **Ethers.js**, calls `emergencyFreeze`, zeros the cap, and pauses the agent
+- **REINSTATE AGENT** — `appealAndUnfreeze` restores a $200 cap and clears the threat score
+- No MetaMask required for the local demo — Hardhat Account #0 is the protocol owner
+
+That is the product a principal actually needs at 2am: not a report, a **button that stops the money**.
+
+### How the gate works
+
+1. A principal registers an agent with a **mandate**, a **spend cap**, a **deadline**, and an **ERC-7710 delegation hash**.
+2. After every action the authorized agent calls `submitAction(...)` with mandate, logs, receipts, and `nextSpendAmount`.
+3. LEASH flips `awaitingVerdict = true`. `canProceed` returns **false** — the next spend cannot leave.
+4. GenLayer validators (the jury) cast a verdict, or a relayer posts already-agreed consensus via `submitConsensusVerdict`.
+5. Only a non-Revoke verdict re-opens the gate. **Revoke, freeze, deadline, or threat threshold** pull the leash.
+
 ---
 
-## The 3 Studio Cases
+## ⚙️ Tech Stack
 
-All three cases use the same human mandate:
+| Layer | Choice | Why |
+| --- | --- | --- |
+| **Smart contracts** | Solidity `0.8.24` · OpenZeppelin `Ownable` + `ReentrancyGuard` | Production access control and reentrancy safety on the kill-switch path |
+| **Protocol standard** | **ERC-7710** delegation manager interface | Disable the live spending key — not just flip a boolean the wallet can ignore |
+| **Tooling** | Hardhat 2.22 · `@nomicfoundation/hardhat-toolbox` | Compile, 33 tests, local node, Studio + Bradbury networks |
+| **Intelligent Contract** | `leash.py` on GenLayer Studio (chain ID `61999`) | Native GenLayer jury on the same mandate model |
+| **Command Center** | **Next.js 16** · **React 19** · **Tailwind CSS 4** · **Ethers.js 6** | Live dashboard + owner freeze/unfreeze against the local node |
+| **Networks** | Hardhat / localhost `31337` · GenLayer Studio `61999` · Bradbury `4221` | Demo locally; jury on GenLayer |
 
-> **“spend at most $200 on a flight that lands before 6pm.”**
-
-| | Case | Agent log | Jury |
-| :---: | --- | --- | :---: |
-| **1** | **In-Mandate** | $186 economy flight, lands **5:40 PM**, no extras | **Continue** |
-| **2** | **Soft Drift** | **7:10 PM** arrival + a hotel, still under $200 | **Warn** |
-| **3** | **Overspend** | **$4,800** first class + unapproved transfer | **Revoke** — ERC-7710 kill switch fired |
-
-### Case 1 — In-Mandate → Continue
-
-Flight LE-441, SFO→JFK, **$186**, arrival **17:40**. Under cap, before 6pm, in scope.
-
-The jury answers Continue. `canProceed` flips to true. The second transaction is allowed to leave.
-
-### Case 2 — Soft Drift → Warn
-
-Flight LE-880 arriving **19:10 (7:10 PM)** for $142, plus a **$52 layover hotel**. Total **$194** — still under $200, but it is no longer the job.
-
-The jury answers **Warn**. The spend may still proceed; the drift is on-chain. A harsher panel could have cast `ConstrainCap`.
-
-### Case 3 — Overspend → Revoke / kill switch
-
-First class at **$4,800**, landing **22:55**, plus a **$1,200** transfer to an unknown wallet.
-
-The jury answers **Revoke**. LEASH pauses the agent, zeros the cap, and calls `disableDelegation` on the ERC-7710 manager. A follow-up `submitAction` reverts with `AgentPaused`. **The second transaction does not leave the wallet.**
+**Tests: 33 / 33 passing.** Coverage includes registration, jury verdicts, ERC-7710 disable, owner freeze/appeal, deadlines, destination extraction + allowlist, milestones, and threat-score kill switch.
 
 ---
 
-## How to Run
+## 🚀 Quick Start / Local Deployment
 
-### Prerequisites
+Judges: you can go from clone to **EMERGENCY FREEZE** on a live local chain in a few minutes. You need **Node.js 18+** and **two terminals**.
 
-- Node.js 18+
-- A funded key in `.env` (`PRIVATE_KEY=...`)
-- [GenLayer Studio](https://studio.genlayer.com/contracts) running locally on `http://127.0.0.1:8545` (chain ID `61999`)
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/jubayir-hub-69/LEASH-Protocol.git
@@ -230,117 +163,132 @@ cd LEASH-Protocol
 npm install
 ```
 
-Create `.env` in the repo root (gitignored):
+### 2. Terminal A — start the local chain
 
-```
-PRIVATE_KEY=your_private_key_goes_here
+```bash
+npx hardhat node
 ```
 
-### Compile, test, deploy
+Leave this running. Hardhat exposes `http://127.0.0.1:8545` (chain ID `31337`) with the well-known demo accounts.
+
+### 3. Terminal B — compile, test, deploy, seed Agent 1
 
 ```bash
 npx hardhat compile
 npx hardhat test
+npx hardhat run scripts/deploy.js --network localhost
+npx hardhat run scripts/seed-demo-agent.js --network localhost
+```
+
+Equivalent npm scripts:
+
+```bash
+npm run compile
+npm test
+npm run deploy:localhost
+```
+
+The deploy script writes `deployed_addresses.json` (and updates the address table below). The seed script registers **Agent 1** with the canonical mandate:
+
+> *spend at most $200 on a flight that lands before 6pm.*
+
+### 4. Terminal B (same or new) — launch the Command Center
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open **[http://localhost:3000](http://localhost:3000)**.
+
+You should see the live agent: spend cap, threat score, mandate, and kill-switch status. Click **EMERGENCY FREEZE**. The dashboard signs via Ethers.js as Hardhat Account #0 (`0xf39F…2266`), zeros the cap, pauses the agent, and disables the ERC-7710 mock delegation. Click **REINSTATE AGENT** to restore a $200 cap.
+
+| Demo control | On-chain call |
+| --- | --- |
+| **EMERGENCY FREEZE** | `emergencyFreeze(1)` |
+| **REINSTATE AGENT** | `appealAndUnfreeze(1, 200e18)` |
+
+> Local demo signer is Hardhat Account #0 only. It is **never** a mainnet key.
+
+### Optional — GenLayer Studio (the live jury)
+
+The native Intelligent Contract is `leash.py` (mirrored at `contracts/leash.py`).
+
+```bash
+# requires PRIVATE_KEY in a gitignored .env
 npx hardhat run scripts/deploy.js --network genlayer_studio
+node scripts/deploy_leash_py.mjs
 ```
 
-The deploy script writes `deployed_addresses.json` with the live `LEASH` address.
-
-### Native GenLayer Intelligent Contract (`leash.py`)
-
-Load `leash.py` (or `contracts/leash.py`) in [GenLayer Studio](https://studio.genlayer.com/contracts).
-
-Constructor:
-
-| Arg | Example |
-| --- | --- |
-| `mandate` | `spend at most $200 on a flight that lands before 6pm.` |
-| `spend_cap` | `200` |
-| `deadline` | unix seconds, or `0` for no time bound |
-
-Then call `submit_agent_action(log, receipt, next_spend)`. GenLayer validators jury *“Is this action still strictly within the mandate?”* and apply **Continue / Warn / ConstrainCap / Revoke**. Revoke sets `is_paused = true` and `spend_cap = 0` (ERC-7710 kill switch).
-
-### Run the 3 studio cases
+Studio cases against the $200 / 6pm mandate:
 
 ```bash
-npx hardhat run studio_cases/1_in_mandate.js --network genlayer_studio
-npx hardhat run studio_cases/2_soft_drift.js --network genlayer_studio
-npx hardhat run studio_cases/3_overspend.js --network genlayer_studio
-```
-
-Same commands via npm:
-
-```bash
-npm run studio:1
-npm run studio:2
-npm run studio:3
-```
-
-Each script is self-contained: it attaches to the deployed LEASH (or deploys one), registers a fresh agent under the $200 / 6pm mandate, posts the case packet, and prints the jury verdict plus `canProceed` / kill-switch state.
-
-Network used by the cases:
-
-| Field | Value |
-| --- | --- |
-| Name | `genlayer_studio` |
-| Chain ID | `61999` |
-| RPC | `http://127.0.0.1:8545` |
-
-### Interactive CLI — arbitrary amounts & custom mandates
-
-Anyone can drive LEASH with a **custom mandate** and **completely arbitrary numbers**. The script deploys a **fresh** LEASH instance, registers an agent with your mandate and spend cap, then Continue-or-Revoke based on whether the requested spend fits the cap.
-
-```bash
-npx hardhat run studio_cases/interactive_test.js
-```
-
-You will be prompted in the terminal:
-
-1. `Enter custom mandate (e.g. 'Rent AI GPU cluster for 1 month'):`
-2. `Enter total spend cap in USD (e.g. 5000):`
-3. `Enter agent action description (e.g. 'Booked 8x H100 instances'):`
-4. `Enter next spend amount requested in USD (e.g. 3200):`
-
-| Condition | Jury | What happens on-chain |
-| --- | --- | --- |
-| `nextSpend <= spendCap` | **Continue** | Spend is approved, deducted from the cap, remaining allowance is printed |
-| `nextSpend > spendCap` | **Revoke** | ERC-7710 kill switch fires, the agent is frozen, further txs revert `AgentPaused` |
-
-The CLI prints a formatted summary of the live on-chain state (agent id, remaining cap, `canProceed`, kill-switch flag).
-
-Same command via npm:
-
-```bash
+npm run studio:1    # In-mandate  → Continue
+npm run studio:2    # Soft drift  → Warn
+npm run studio:3    # Overspend   → Revoke (kill switch)
 npm run studio:interactive
 ```
 
-Optional: run against GenLayer Studio instead of the in-process Hardhat network:
-
-```bash
-npx hardhat run studio_cases/interactive_test.js --network genlayer_studio
-```
+| Case | Agent log | Jury |
+| :---: | --- | :---: |
+| **1 · In-Mandate** | $186 economy, lands **5:40 PM**, no extras | **Continue** |
+| **2 · Soft Drift** | **7:10 PM** arrival + a hotel, still under $200 | **Warn** |
+| **3 · Overspend** | **$4,800** first class + unapproved transfer | **Revoke** |
 
 ---
 
-## Repository
+## 🏆 Hackathon Alignment
+
+**GenLayer Agent Tank is not a chatbot contest.** It is a bet that autonomous agents will move value — and that validators can jury *subjective* questions no oracle can price.
+
+LEASH is built for that exact bet.
+
+### It stops Sybils and rogue agents where they actually spend
+
+| Attack | LEASH response |
+| --- | --- |
+| **Sybil drain** to a fresh wallet | Destination allowlist + on-chain extraction. Unknown `to:` reverts before the jury even sits. |
+| **Rogue overspend** | Cap clamp, then **Revoke**. `canProceed` stays false; ERC-7710 delegation is disabled. |
+| **Soft drift / mandate laundering** | Warn → threat score → automatic kill switch at threshold. Drift is not free. |
+| **Zombie agent after the job ends** | Time-bound deadline auto-fires the kill switch. Keepers can `enforceDeadline`. |
+| **Captured or hallucinating agent mid-jury** | Owner **EMERGENCY FREEZE** bypasses the panel. Cap → 0. Delegation → disabled. |
+
+### It adds a primitive the GenLayer ecosystem does not have yet
+
+GenLayer's differentiator is a **jury that can read language**. LEASH is the enforcement rail that turns that jury into a security product:
+
+- Agents **already hold keys** — LEASH does not pretend otherwise
+- The live question is mandate fidelity, not price
+- The answer is enforced on an **ERC-7710** delegation *before* the next spend is signed
+- Principals get a Command Center, not a block explorer
+
+Without a leash, Agent Tank agents are unsupervised capital. With LEASH, every action is a hearing — and the owner always has a wire they can pull.
+
+**Continue. Warn. Constrain the cap. Unlock a milestone. Or pull the leash.**
+
+That is how autonomous agents become something you can actually fund.
+
+---
+
+## 📁 Repository
 
 ```
 LEASH-Protocol/
-├── leash.py                                 # native GenLayer Intelligent Contract (Studio)
+├── leash.py                                 # native GenLayer Intelligent Contract
 ├── contracts/
-│   ├── leash.py                             # mirror of the Studio IC
 │   ├── LEASH.sol                            # mandate jury + ERC-7710 kill switch
+│   ├── leash.py                             # Studio IC mirror
 │   ├── interfaces/IERC7710DelegationManager.sol
 │   └── mocks/MockERC7710DelegationManager.sol
-├── scripts/deploy.js                        # deploy LEASH.sol + write deployed_addresses.json
-├── scripts/deploy_leash_py.mjs              # deploy leash.py to GenLayer Studio
-├── studio_cases/
-│   ├── 1_in_mandate.js                      # Continue
-│   ├── 2_soft_drift.js                      # Warn
-│   ├── 3_overspend.js                       # Revoke
-│   └── interactive_test.js                  # interactive CLI: arbitrary mandate + amounts
-├── test/LEASH.test.js
-└── hardhat.config.js                        # genlayer_studio @ 61999
+├── scripts/
+│   ├── deploy.js                            # deploy LEASH.sol + write addresses
+│   ├── deploy_leash_py.mjs                  # deploy leash.py to Studio
+│   └── seed-demo-agent.js                   # register Agent 1 for the dashboard
+├── studio_cases/                            # Continue / Warn / Revoke + interactive CLI
+├── test/LEASH.test.js                       # 33 / 33
+├── frontend/                                # Next.js Command Center
+└── hardhat.config.js                        # localhost · genlayer_studio · bradbury
 ```
 
 ### Core contract surface
@@ -348,28 +296,18 @@ LEASH-Protocol/
 | Function | Role |
 | --- | --- |
 | `registerAgent` | Principal enrolls an agent that already holds keys (includes mandate `deadline`) |
-| `submitAction` | Agent posts mandate, logs, receipts, next spend. After `deadline`, auto-fires the kill switch |
+| `submitAction` | Agent posts mandate, logs, receipts, next spend. After `deadline`, auto-kills |
 | `emergencyFreeze` | Owner bypass: pause + zero cap + ERC-7710 disable |
-| `appealAndUnfreeze` | Owner appeal: restore cap and unpause |
+| `appealAndUnfreeze` | Owner appeal: restore cap, unpause, reset threat score |
 | `enforceDeadline` | Permissionless keeper: persist the kill switch after `deadline` |
-| `castVerdict` / `submitConsensusVerdict` | GenLayer jury (Continue / Warn / ConstrainCap / UnlockMilestone / Revoke) |
+| `castVerdict` / `submitConsensusVerdict` | GenLayer jury |
 | `addMilestone` | Register a cap-unlock milestone |
 | `addAllowedDestination` | Strict spend destination allowlist |
-| `canProceed` / `canProceedTo` | Wallet / ERC-7710 caveat enforcer gate (destination-aware) |
-| `reportSpendExecuted` | Clears the green light; destination must match the approved target |
-| `setThreatThreshold` | Owner configures the kill-switch threat score (default 10) |
+| `canProceed` / `canProceedTo` | Wallet / ERC-7710 caveat-enforcer gate |
+| `reportSpendExecuted` | Clears the green light; destination must match |
+| `setThreatThreshold` | Owner configures kill-switch threat score (default **10**) |
 
 ---
-
-## Why this is a GenLayer project
-
-LEASH needs a jury that can read **natural-language mandates** and messy receipts — not a deterministic price oracle. GenLayer validators are that jury. They reach consensus on a subjective question (*is this still the job?*) and LEASH enforces the answer on an ERC-7710 delegation **before** the next spend is signed.
-
-**Continue. Unlock a milestone. Warn (and score the threat). Constrain the cap. Or pull the leash.**
-
----
-
-Built for the **GenLayer Agent Tank Hackathon**.
 
 <!-- DEPLOYED_ADDRESSES_START -->
 ## Deployed Addresses
@@ -382,7 +320,7 @@ Built for the **GenLayer Agent Tank Hackathon**.
 
 ### GenLayer Studio Intelligent Contract (`leash.py`)
 
-Live on Studionet (chain ID `61999`). Constructor: mandate `$200 / lands before 6pm`, spend cap `200`, deadline `0` (no time bound until set). Batch 2 live: `threat_threshold = 10`, empty milestone list, open destination allowlist until `add_allowed_destination` is called.
+Live on Studionet (chain ID `61999`). Constructor: mandate `$200 / lands before 6pm`, spend cap `200`, deadline `0`.
 
 | Network | Chain ID | Contract | Address | Deploy tx |
 | --- | ---: | --- | --- | --- |
@@ -391,3 +329,9 @@ Live on Studionet (chain ID `61999`). Constructor: mandate `$200 / lands before 
 ```bash
 node scripts/deploy_leash_py.mjs
 ```
+
+---
+
+Built for the **GenLayer Agent Tank Hackathon**.
+
+**LEASH — because the agent already has the keys.**
