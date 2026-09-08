@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+:root {
+  --background: #03050a;
+  --foreground: #e8f6f0;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-orbitron);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+html,
+body {
+  min-height: 100%;
+  background: #03050a;
+  color: var(--foreground);
+}
+
+body {
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
+}
+
+.cyber-grid {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 255, 156, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 156, 0.035) 1px, transparent 1px),
+    radial-gradient(ellipse at top, rgba(0, 255, 156, 0.08), transparent 55%),
+    radial-gradient(ellipse at 80% 120%, rgba(255, 45, 85, 0.05), transparent 45%);
+  background-size: 56px 56px, 56px 56px, 100% 100%, 100% 100%;
+  mask-image: radial-gradient(ellipse at center, black 35%, transparent 85%);
+}
+
+.vignette {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  box-shadow: inset 0 0 180px rgba(0, 0, 0, 0.72);
+}
+
+.scanlines {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  opacity: 0.09;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    rgba(0, 0, 0, 0.45) 3px
+  );
+}
+
+@keyframes kill-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 24px rgba(255, 45, 85, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 42px rgba(255, 45, 85, 0.32);
+  }
+}
+
+.animate-kill-pulse {
+  animation: kill-pulse 1.8s ease-in-out infinite;
+}
+
+::selection {
+  background: rgba(0, 255, 156, 0.25);
+  color: #f4fff9;
+}

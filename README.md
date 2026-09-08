@@ -377,6 +377,7 @@ Built for the **GenLayer Agent Tank Hackathon**.
 | Network | Chain ID | Contract | Address | Timestamp |
 | --- | ---: | --- | --- | --- |
 | hardhat | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-06T05:24:23.481Z |
+| localhost | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-08T13:58:51.729Z |
 <!-- DEPLOYED_ADDRESSES_END -->
 
 ### GenLayer Studio Intelligent Contract (`leash.py`)
