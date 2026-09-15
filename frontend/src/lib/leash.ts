@@ -47,20 +47,22 @@ export async function fetchAgentSnapshot(
     const provider = new JsonRpcProvider(rpc, CHAIN_ID, { staticNetwork: true });
     const network = await provider.getNetwork();
     const blockNumber = await provider.getBlockNumber();
-    const code = await provider.getCode(address);
-
-    if (!code || code === "0x") {
-      return {
-        ok: false,
-        connected: true,
-        rpc,
-        contractAddress: address,
-        error: "No contract bytecode at the deployed LEASH address.",
-        detail:
-          "Start `npx hardhat node` and redeploy with `npx hardhat run scripts/deploy.js --network localhost`.",
-        fetchedAt,
-      };
-    }
+    // GenLayer Python contracts have no EVM bytecode, so eth_getCode is
+    // empty by design. Skipping this EVM-only gate lets the snapshot
+    // continue via eth_call instead of surfacing a false SIGNAL FAULT.
+    // const code = await provider.getCode(address);
+    // if (!code || code === "0x") {
+    //   return {
+    //     ok: false,
+    //     connected: true,
+    //     rpc,
+    //     contractAddress: address,
+    //     error: "No contract bytecode at the deployed LEASH address.",
+    //     detail:
+    //       "Start `npx hardhat node` and redeploy with `npx hardhat run scripts/deploy.js --network localhost`.",
+    //     fetchedAt,
+    //   };
+    // }
 
     const leash = new Contract(address, LEASH_ABI, provider);
     const agentCount = await leash.agentCount();

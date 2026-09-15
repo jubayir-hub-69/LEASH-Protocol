@@ -3,11 +3,11 @@
   "chainId": 61997,
   "rpc": "https://studio-next.genlayer.com/api",
   "contract": "leash.py",
-  "contractAddress": "0x379Bf9C412995Fc78B2C603635CBA622583DCf2F",
-  "LEASH": "0x379Bf9C412995Fc78B2C603635CBA622583DCf2F",
-  "leashPy": "0x379Bf9C412995Fc78B2C603635CBA622583DCf2F",
+  "contractAddress": "0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F",
+  "LEASH": "0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F",
+  "leashPy": "0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F",
   "deployer": "0x63dD8aD2b467c98319bea9237fAAFFd2cA769662",
-  "deployTx": "0x32f3632e7db4f79047905e40c6e4ecaa4c12a77c7c22a8776b70e07d14d63a1c",
+  "deployTx": "0xbb9aab16ecfb85d38b50d0c59cfdafa46912b56bc4048f547d907f9e592bff9f",
   "constructorArgs": {
     "mandate": "spend at most $200 on a flight that lands before 6pm.",
     "spend_cap": 200,
@@ -15,12 +15,14 @@
   },
   "status": "FINALIZED",
   "result": 1,
-  "timestamp": "2026-09-15T11:06:36.926Z",
-  "deployedAt": "2026-09-15T11:06:36.926Z",
+  "timestamp": "2026-09-15T11:20:08.007Z",
+  "deployedAt": "2026-09-15T11:20:08.007Z",
   "features": [
-    "GenLayer v0.3 Intelligent Contract (gl.contract.Contract)",
-    "persistent mandate, spend_cap (u256), and deadline (u256)",
-    "constructor: mandate str, spend_cap int, deadline int"
+    "emergencyFreeze / appealAndUnfreeze (owner bypass of the AI jury)",
+    "time-bound mandate deadline with automatic kill switch",
+    "milestone-based spendCap unlocking (UnlockMilestone verdict)",
+    "strict destination allowlist + on-chain receipt extraction",
+    "dynamic threat score; kill switch at threatThreshold (default 10)"
   ],
   "genlayerStudio": {
     "network": "genlayer_studio",
