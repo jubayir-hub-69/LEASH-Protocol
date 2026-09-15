@@ -2,13 +2,14 @@ import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { Contract, JsonRpcProvider, ZeroAddress } from "ethers";
 import { LEASH_ABI } from "./abi";
-import { AGENT_ID, FALLBACK_LEASH_ADDRESS, HARDHAT_RPC } from "./config";
+import { AGENT_ID, CHAIN_ID, FALLBACK_LEASH_ADDRESS, HARDHAT_RPC } from "./config";
 import { formatUsdFromWei, verdictName } from "./format";
 import type { AgentResponse } from "./types";
 
 type DeployedFile = {
   LEASH?: string;
   contractAddress?: string;
+  leashPy?: string;
 };
 
 function deployedAddressCandidates(): string[] {
@@ -24,7 +25,7 @@ export function loadLeashAddress(): { address: string; source: string } {
     if (!existsSync(file)) continue;
     try {
       const parsed = JSON.parse(readFileSync(file, "utf8")) as DeployedFile;
-      const address = parsed.LEASH || parsed.contractAddress;
+      const address = parsed.LEASH || parsed.contractAddress || parsed.leashPy;
       if (typeof address === "string" && /^0x[a-fA-F0-9]{40}$/.test(address)) {
         return { address, source: file };
       }
@@ -32,7 +33,7 @@ export function loadLeashAddress(): { address: string; source: string } {
       continue;
     }
   }
-  return { address: FALLBACK_LEASH_ADDRESS, source: "hardhat-fallback" };
+  return { address: FALLBACK_LEASH_ADDRESS, source: "studio-next-fallback" };
 }
 
 export async function fetchAgentSnapshot(
@@ -43,7 +44,7 @@ export async function fetchAgentSnapshot(
   const fetchedAt = new Date().toISOString();
 
   try {
-    const provider = new JsonRpcProvider(rpc, undefined, { staticNetwork: true });
+    const provider = new JsonRpcProvider(rpc, CHAIN_ID, { staticNetwork: true });
     const network = await provider.getNetwork();
     const blockNumber = await provider.getBlockNumber();
     const code = await provider.getCode(address);
@@ -136,7 +137,7 @@ export async function fetchAgentSnapshot(
       rpc,
       contractAddress: address,
       error: offline
-        ? "Hardhat node unreachable at http://127.0.0.1:8545"
+        ? "Studio Next RPC unreachable at https://studio-next.genlayer.com/api"
         : "Failed to read Agent ID 1 from LEASH",
       detail: message,
       fetchedAt,

@@ -1,7 +1,14 @@
-export const HARDHAT_RPC = "http://127.0.0.1:8545";
+export const STUDIO_NEXT_RPC = "https://studio-next.genlayer.com/api";
+export const HARDHAT_RPC =
+  process.env.NEXT_PUBLIC_RPC_URL ||
+  process.env.NEXT_PUBLIC_HARDHAT_RPC ||
+  STUDIO_NEXT_RPC;
+export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 61997);
 export const AGENT_ID = 1;
 export const FALLBACK_LEASH_ADDRESS =
-  "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
+  process.env.NEXT_PUBLIC_LEASH_ADDRESS ||
+  "0x379Bf9C412995Fc78B2C603635CBA622583DCf2F";
 export const POLL_INTERVAL_MS = 4000;
 
 /** Well-known Hardhat Account #0. Local demo signer only — never a mainnet key. */

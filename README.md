@@ -147,7 +147,7 @@ That is the product a principal actually needs at 2am: not a report, a **button 
 | **Smart contracts** | Solidity `0.8.24` · OpenZeppelin `Ownable` + `ReentrancyGuard` | Production access control and reentrancy safety on the kill-switch path |
 | **Protocol standard** | **ERC-7710** delegation manager interface | Disable the live spending key — not just flip a boolean the wallet can ignore |
 | **Tooling** | Hardhat 2.22 · `@nomicfoundation/hardhat-toolbox` | Compile, 33 tests, local node, Studio Next + Studio + Bradbury networks |
-| **Intelligent Contract** | `leash.py` on GenLayer Studio (chain ID `61999`) | Native GenLayer jury on the same mandate model |
+| **Intelligent Contract** | `leash.py` on GenLayer Studio Next (chain ID `61997`) | Native GenLayer contract on the required hackathon network |
 | **Command Center** | **Next.js 16** · **React 19** · **Tailwind CSS 4** · **Ethers.js 6** | Live dashboard + owner freeze/unfreeze against the local node |
 | **Networks** | Hardhat / localhost `31337` · **GenLayer Studio Next `61997` (required)** · GenLayer Studio `61999` · Bradbury `4221` | Demo locally; **hackathon submission on Studio Next**; legacy Studio + Bradbury retained |
 
@@ -333,14 +333,16 @@ LEASH-Protocol/
 | --- | ---: | --- | --- | --- |
 | hardhat | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-06T05:24:23.481Z |
 | localhost | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-08T14:52:06.795Z |
+| studio_next | 61997 | LEASH | `0x379Bf9C412995Fc78B2C603635CBA622583DCf2F` | 2026-09-15T11:06:36.926Z |
 <!-- DEPLOYED_ADDRESSES_END -->
 
 ### GenLayer Studio Intelligent Contract (`leash.py`)
 
-Live on Studionet (chain ID `61999`). Constructor: mandate `$200 / lands before 6pm`, spend cap `200`, deadline `0`.
+Live on Studio Next (chain ID `61997`). Constructor: mandate `$200 / lands before 6pm`, spend cap `200`, deadline `0`.
 
 | Network | Chain ID | Contract | Address | Deploy tx |
 | --- | ---: | --- | --- | --- |
+| studio_next | 61997 | leash.py | `0x379Bf9C412995Fc78B2C603635CBA622583DCf2F` | [`0x32f3632e…d63a1c`](https://studio-next.genlayer.com) |
 | genlayer_studio | 61999 | leash.py | `0x3bba2d2d84a95006084aFabc0F02a6dE472D57A4` | [`0x91e06782…06d997`](https://studio.genlayer.com/contracts) |
 
 ```bash

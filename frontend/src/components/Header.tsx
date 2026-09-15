@@ -39,7 +39,7 @@ export function Header({
 }) {
   const live = Boolean(data?.ok);
   const address = data && "contractAddress" in data ? data.contractAddress : undefined;
-  const chainId = data && data.ok ? data.chainId : 31337;
+  const chainId = data && data.ok ? data.chainId : 61997;
   const block = data && data.ok ? data.blockNumber : null;
 
   return (
@@ -64,7 +64,7 @@ export function Header({
               label={live ? "UPLINK LIVE" : "UPLINK SEEKING"}
               on={live}
             />
-            <Meta label="NET" value={`HARDHAT ${chainId}`} />
+            <Meta label="NET" value={`STUDIO NEXT ${chainId}`} />
             <Meta
               label="LEASH"
               value={address ? shortenAddress(address, 4) : "—"}

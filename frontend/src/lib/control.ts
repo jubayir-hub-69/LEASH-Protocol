@@ -2,6 +2,7 @@ import { Contract, JsonRpcProvider, Wallet, parseEther } from "ethers";
 import { LEASH_ABI } from "./abi";
 import {
   AGENT_ID,
+  CHAIN_ID,
   FALLBACK_LEASH_ADDRESS,
   HARDHAT_DEPLOYER_KEY,
   HARDHAT_RPC,
@@ -47,7 +48,7 @@ async function connectOwner(contractAddress: string) {
 
   for (const rpc of rpcCandidates()) {
     try {
-      const provider = new JsonRpcProvider(rpc);
+      const provider = new JsonRpcProvider(rpc, CHAIN_ID, { staticNetwork: true });
       await provider.getBlockNumber();
       const signer = new Wallet(HARDHAT_DEPLOYER_KEY, provider);
       return { contract: new Contract(address, LEASH_ABI, signer), rpc };

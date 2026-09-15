@@ -1,20 +1,26 @@
 {
-  "network": "localhost",
-  "chainId": 31337,
-  "contractAddress": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  "LEASH": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "MockERC7710DelegationManager": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-  "verdictThreshold": 1,
-  "threatThreshold": 10,
-  "timestamp": "2026-09-08T14:52:06.795Z",
-  "deployedAt": "2026-09-08T14:52:06.795Z",
+  "network": "studio_next",
+  "chainId": 61997,
+  "rpc": "https://studio-next.genlayer.com/api",
+  "contract": "leash.py",
+  "contractAddress": "0x379Bf9C412995Fc78B2C603635CBA622583DCf2F",
+  "LEASH": "0x379Bf9C412995Fc78B2C603635CBA622583DCf2F",
+  "leashPy": "0x379Bf9C412995Fc78B2C603635CBA622583DCf2F",
+  "deployer": "0x63dD8aD2b467c98319bea9237fAAFFd2cA769662",
+  "deployTx": "0x32f3632e7db4f79047905e40c6e4ecaa4c12a77c7c22a8776b70e07d14d63a1c",
+  "constructorArgs": {
+    "mandate": "spend at most $200 on a flight that lands before 6pm.",
+    "spend_cap": 200,
+    "deadline": 0
+  },
+  "status": "FINALIZED",
+  "result": 1,
+  "timestamp": "2026-09-15T11:06:36.926Z",
+  "deployedAt": "2026-09-15T11:06:36.926Z",
   "features": [
-    "emergencyFreeze / appealAndUnfreeze (owner bypass of the AI jury)",
-    "time-bound mandate deadline with automatic kill switch",
-    "milestone-based spendCap unlocking (UnlockMilestone verdict)",
-    "strict destination allowlist + on-chain receipt extraction",
-    "dynamic threat score; kill switch at threatThreshold (default 10)"
+    "GenLayer v0.3 Intelligent Contract (gl.contract.Contract)",
+    "persistent mandate, spend_cap (u256), and deadline (u256)",
+    "constructor: mandate str, spend_cap int, deadline int"
   ],
   "genlayerStudio": {
     "network": "genlayer_studio",

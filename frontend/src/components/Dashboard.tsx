@@ -24,7 +24,7 @@ export function Dashboard() {
         setData({
           ok: false,
           connected: false,
-          rpc: "http://127.0.0.1:8545",
+          rpc: "https://studio-next.genlayer.com/api",
           error: "Dashboard could not reach the local API",
           detail: error instanceof Error ? error.message : String(error),
           fetchedAt: new Date().toISOString(),
@@ -65,7 +65,7 @@ export function Dashboard() {
 
         {!data ? (
           <p className="font-mono text-[11px] tracking-[0.3em] text-emerald-500/80">
-            ESTABLISHING UPLINK TO HARDHAT NODE…
+            ESTABLISHING UPLINK TO STUDIO NEXT…
           </p>
         ) : null}
 
@@ -77,7 +77,7 @@ export function Dashboard() {
 
         <footer className="mt-auto flex flex-col gap-2 border-t border-white/8 py-4 font-mono text-[10px] tracking-widest text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            RPC {agent?.rpc ?? "http://127.0.0.1:8545"} · AGENT ID 1 · OWNER OVERRIDE ENABLED
+            RPC {agent?.rpc ?? "https://studio-next.genlayer.com/api"} · CHAIN 61997 · AGENT ID 1 · OWNER OVERRIDE ENABLED
           </span>
           <span>
             LAST SYNC {agent?.fetchedAt ?? data?.fetchedAt ?? "—"} · POLL {POLL_INTERVAL_MS / 1000}s
