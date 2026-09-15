@@ -1,9 +1,12 @@
 import { existsSync, readFileSync } from "fs";
 import path from "path";
-import { Contract, JsonRpcProvider, ZeroAddress } from "ethers";
-import { LEASH_ABI } from "./abi";
-import { AGENT_ID, CHAIN_ID, FALLBACK_LEASH_ADDRESS, HARDHAT_RPC } from "./config";
-import { formatUsdFromWei, verdictName } from "./format";
+import {
+  CHAIN_ID,
+  FALLBACK_LEASH_ADDRESS,
+  STUDIO_NEXT_RPC,
+} from "./config";
+import { formatUsd } from "./format";
+import { createLeashClient, readLeashStorage } from "./genlayer";
 import type { AgentResponse } from "./types";
 
 type DeployedFile = {
@@ -36,100 +39,82 @@ export function loadLeashAddress(): { address: string; source: string } {
   return { address: FALLBACK_LEASH_ADDRESS, source: "studio-next-fallback" };
 }
 
-export async function fetchAgentSnapshot(
-  agentId = AGENT_ID
-): Promise<AgentResponse> {
-  const rpc = HARDHAT_RPC;
+function constructorParamNames(schema: unknown): string[] {
+  const ctor = (schema as { ctor?: { params?: unknown } } | null)?.ctor;
+  const params = ctor?.params;
+  if (!Array.isArray(params)) return [];
+  return params
+    .map((entry) => (Array.isArray(entry) ? String(entry[0] ?? "") : ""))
+    .filter(Boolean);
+}
+
+let cachedSchema: unknown = null;
+
+function methodCount(schema: unknown): number {
+  const methods = (schema as { methods?: Record<string, unknown> } | null)
+    ?.methods;
+  return methods ? Object.keys(methods).length : 0;
+}
+
+export async function fetchAgentSnapshot(): Promise<AgentResponse> {
+  const rpc = STUDIO_NEXT_RPC;
   const { address, source } = loadLeashAddress();
   const fetchedAt = new Date().toISOString();
 
   try {
-    const provider = new JsonRpcProvider(rpc, CHAIN_ID, { staticNetwork: true });
-    const network = await provider.getNetwork();
-    const blockNumber = await provider.getBlockNumber();
-    // GenLayer Python contracts have no EVM bytecode, so eth_getCode is
-    // empty by design. Skipping this EVM-only gate lets the snapshot
-    // continue via eth_call instead of surfacing a false SIGNAL FAULT.
-    // const code = await provider.getCode(address);
-    // if (!code || code === "0x") {
-    //   return {
-    //     ok: false,
-    //     connected: true,
-    //     rpc,
-    //     contractAddress: address,
-    //     error: "No contract bytecode at the deployed LEASH address.",
-    //     detail:
-    //       "Start `npx hardhat node` and redeploy with `npx hardhat run scripts/deploy.js --network localhost`.",
-    //     fetchedAt,
-    //   };
-    // }
+    const client = createLeashClient();
+    const contractAddress = address as `0x${string}`;
 
-    const leash = new Contract(address, LEASH_ABI, provider);
-    const agentCount = await leash.agentCount();
+    const { mandate, spendCap, deadline } = await readLeashStorage(
+      client,
+      contractAddress
+    );
 
-    if (agentCount < BigInt(agentId)) {
-      return {
-        ok: false,
-        connected: true,
-        rpc,
-        contractAddress: address,
-        error: `Agent ID ${agentId} is not registered (agentCount=${agentCount}).`,
-        detail: "Run `npx hardhat run scripts/seed-demo-agent.js --network localhost`.",
-        fetchedAt,
-      };
+    let schema: unknown = cachedSchema;
+    if (!schema) {
+      try {
+        schema = await client.getContractSchema(contractAddress);
+        cachedSchema = schema;
+      } catch {
+        schema = { ctor: { params: [] }, methods: {} };
+      }
     }
 
-    const [agent, threatThreshold] = await Promise.all([
-      leash.getAgent(agentId),
-      leash.threatThreshold(),
-    ]);
-
-    const approvedNext = agent.approvedNextSpend as bigint;
-    const [authorized, reason] = await leash.canProceed(agentId, approvedNext);
+    const deadlineSeconds = Number(deadline);
+    const deadlineOpen = deadlineSeconds === 0;
+    const expired = !deadlineOpen && deadlineSeconds * 1000 <= Date.now();
+    const capIsZero = spendCap === BigInt(0);
+    const canProceed = !capIsZero && !expired;
 
     return {
       ok: true,
       connected: true,
       rpc,
-      chainId: Number(network.chainId),
-      blockNumber,
-      contractAddress: address,
+      chainId: CHAIN_ID,
+      blockNumber: null,
+      contractAddress,
       addressSource: source,
-      agentId,
-      agentCount: Number(agentCount),
-      wallet: agent.wallet,
-      principal: agent.principal,
-      mandate: agent.mandate,
-      mandateHash: agent.mandateHash,
-      spendCapWei: agent.spendCap.toString(),
-      spendCapUsd: formatUsdFromWei(agent.spendCap),
-      expiresAt: Number(agent.expiresAt),
-      deadline: Number(agent.deadline),
-      erc7710DelegationHash: agent.erc7710DelegationHash,
-      delegationManager: agent.delegationManager,
-      paused: Boolean(agent.paused),
-      registered: Boolean(agent.registered),
-      awaitingVerdict: Boolean(agent.awaitingVerdict),
-      nonce: agent.nonce.toString(),
-      warningCount: Number(agent.warningCount),
-      threatScore: Number(agent.threatScore),
-      threatThreshold: Number(threatThreshold),
-      approvedNextSpendUsd: formatUsdFromWei(approvedNext),
-      lastSubmissionId: agent.lastSubmissionId.toString(),
-      approvedDestination:
-        agent.approvedDestination === ZeroAddress
-          ? "—"
-          : agent.approvedDestination,
-      lastVerdict: verdictName(agent.lastVerdict),
-      killSwitchStatus: agent.paused ? "ACTIVE" : "DISABLED",
-      canProceed: Boolean(authorized),
-      canProceedReason: reason || (authorized ? "authorized" : "blocked"),
+      mandate,
+      spendCap: spendCap.toString(),
+      spendCapUsd: formatUsd(spendCap),
+      deadline: deadlineSeconds,
+      deadlineOpen,
+      expired,
+      canProceed,
+      canProceedReason: capIsZero
+        ? "spend_cap is zero"
+        : expired
+          ? "deadline has passed"
+          : "spend_cap is live and deadline is open",
+      killSwitchStatus: canProceed ? "DISABLED" : "ACTIVE",
+      constructorParams: constructorParamNames(schema),
+      methodCount: methodCount(schema),
       fetchedAt,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const offline =
-      /ECONNREFUSED|ENOTFOUND|failed to detect network|could not detect network|connect/i.test(
+      /ECONNREFUSED|ENOTFOUND|failed to detect network|could not detect network|connect|fetch failed/i.test(
         message
       );
 
@@ -140,7 +125,7 @@ export async function fetchAgentSnapshot(
       contractAddress: address,
       error: offline
         ? "Studio Next RPC unreachable at https://studio-next.genlayer.com/api"
-        : "Failed to read Agent ID 1 from LEASH",
+        : "Failed to read LEASH state from Studio Next",
       detail: message,
       fetchedAt,
     };

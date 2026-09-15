@@ -1,12 +1,3 @@
-export const VERDICT_NAMES = [
-  "Continue",
-  "Warn",
-  "ConstrainCap",
-  "Revoke",
-  "UnlockMilestone",
-] as const;
-
-export type VerdictName = (typeof VERDICT_NAMES)[number];
 export type KillSwitchStatus = "ACTIVE" | "DISABLED";
 
 export type AgentSnapshot = {
@@ -14,35 +5,20 @@ export type AgentSnapshot = {
   connected: true;
   rpc: string;
   chainId: number;
-  blockNumber: number;
+  blockNumber: number | null;
   contractAddress: string;
   addressSource: string;
-  agentId: number;
-  agentCount: number;
-  wallet: string;
-  principal: string;
   mandate: string;
-  mandateHash: string;
-  spendCapWei: string;
+  spendCap: string;
   spendCapUsd: string;
-  expiresAt: number;
   deadline: number;
-  erc7710DelegationHash: string;
-  delegationManager: string;
-  paused: boolean;
-  registered: boolean;
-  awaitingVerdict: boolean;
-  nonce: string;
-  warningCount: number;
-  threatScore: number;
-  threatThreshold: number;
-  approvedNextSpendUsd: string;
-  lastSubmissionId: string;
-  approvedDestination: string;
-  lastVerdict: VerdictName;
-  killSwitchStatus: KillSwitchStatus;
+  deadlineOpen: boolean;
+  expired: boolean;
   canProceed: boolean;
   canProceedReason: string;
+  killSwitchStatus: KillSwitchStatus;
+  constructorParams: string[];
+  methodCount: number;
   fetchedAt: string;
 };
 

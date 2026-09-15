@@ -69,7 +69,7 @@ export function Header({
               label="LEASH"
               value={address ? shortenAddress(address, 4) : "—"}
             />
-            <Meta label="BLK" value={block != null ? String(block) : "—"} />
+            {block != null ? <Meta label="BLK" value={String(block)} /> : null}
             <Meta label="UTC" value={clock} />
           </div>
         </div>

@@ -8,33 +8,21 @@ import { StatusCards } from "./StatusCards";
 import { POLL_INTERVAL_MS } from "@/lib/config";
 import type { AgentResponse } from "@/lib/types";
 
-const BYTECODE_FAULT =
-  "No contract bytecode at the deployed LEASH address.";
-
 export function Dashboard() {
   const [data, setData] = useState<AgentResponse | null>(null);
   const [clock, setClock] = useState("--:--:--");
   const loadSeq = useRef(0);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
+  const inflight = useRef(false);
 
   const load = useCallback(async () => {
+    if (inflight.current) return;
+    inflight.current = true;
     const seq = ++loadSeq.current;
     try {
       const response = await fetch("/api/agent", { cache: "no-store" });
       const payload = (await response.json()) as AgentResponse;
       if (seq !== loadSeq.current) return;
-      setData(payload);
-      // /api/agent returns 404 when the snapshot is connected but not ok
-      // (historically the EVM bytecode check). Keep polling on 200; stop
-      // on 404 so the Next.js terminal is not spammed.
-      if (response.status === 404) stopPolling();
+      setData((prev) => (payload.ok || !prev?.ok ? payload : prev));
     } catch (error) {
       if (seq === loadSeq.current) {
         setData({
@@ -46,14 +34,29 @@ export function Dashboard() {
           fetchedAt: new Date().toISOString(),
         });
       }
+    } finally {
+      inflight.current = false;
     }
-  }, [stopPolling]);
+  }, []);
 
   useEffect(() => {
-    void load();
-    pollRef.current = setInterval(() => void load(), POLL_INTERVAL_MS);
-    return () => stopPolling();
-  }, [load, stopPolling]);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const loop = async () => {
+      await load();
+      if (cancelled) return;
+      timer = setTimeout(() => {
+        void loop();
+      }, POLL_INTERVAL_MS);
+    };
+
+    void loop();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [load]);
 
   useEffect(() => {
     const tick = () =>
@@ -85,9 +88,7 @@ export function Dashboard() {
           </p>
         ) : null}
 
-        {data && !data.ok && data.error !== BYTECODE_FAULT ? (
-          <ErrorBanner data={data} />
-        ) : null}
+        {data && !data.ok ? <ErrorBanner data={data} /> : null}
 
         <StatusCards agent={agent} />
         <MandatePanel agent={agent} />
@@ -95,7 +96,7 @@ export function Dashboard() {
 
         <footer className="mt-auto flex flex-col gap-2 border-t border-white/8 py-4 font-mono text-[10px] tracking-widest text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            RPC {agent?.rpc ?? "https://studio-next.genlayer.com/api"} · CHAIN 61997 · AGENT ID 1 · OWNER OVERRIDE ENABLED
+            RPC {agent?.rpc ?? "https://studio-next.genlayer.com/api"} · CHAIN 61997 · GENLAYER-JS · STORAGE VARS MANDATE / SPEND_CAP / DEADLINE
           </span>
           <span>
             LAST SYNC {agent?.fetchedAt ?? data?.fetchedAt ?? "—"} · POLL {POLL_INTERVAL_MS / 1000}s

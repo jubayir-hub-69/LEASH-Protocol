@@ -14,12 +14,12 @@ export function MandatePanel({ agent }: { agent: AgentSnapshot | null }) {
             Current Mandate
           </h2>
           <p className="mt-1 font-mono text-[11px] text-slate-500">
-            The rules the agent must follow
+            Live `mandate` string stored on the Studio Next Intelligent Contract
           </p>
         </div>
         {agent ? (
           <p className="font-mono text-[10px] tracking-widest text-slate-500">
-            HASH {shortenAddress(agent.mandateHash, 6)}
+            LEASH {shortenAddress(agent.contractAddress, 6)}
           </p>
         ) : null}
       </div>
@@ -32,13 +32,22 @@ export function MandatePanel({ agent }: { agent: AgentSnapshot | null }) {
       </blockquote>
 
       <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Fact label="Agent wallet" value={agent ? shortenAddress(agent.wallet) : "—"} />
-        <Fact label="Principal" value={agent ? shortenAddress(agent.principal) : "—"} />
+        <Fact label="Spend cap" value={agent ? agent.spendCapUsd : "—"} />
         <Fact
           label="Deadline"
           value={
             agent
-              ? `${formatCountdown(agent.deadline)} · ${formatUnix(agent.deadline)}`
+              ? agent.deadlineOpen
+                ? "OPEN · deadline = 0"
+                : `${formatCountdown(agent.deadline)} · ${formatUnix(agent.deadline)}`
+              : "—"
+          }
+        />
+        <Fact
+          label="Constructor"
+          value={
+            agent?.constructorParams.length
+              ? agent.constructorParams.join(" · ")
               : "—"
           }
         />
@@ -46,14 +55,12 @@ export function MandatePanel({ agent }: { agent: AgentSnapshot | null }) {
           label="Jury gate"
           value={
             agent
-              ? agent.awaitingVerdict
-                ? "AWAITING VERDICT"
-                : agent.canProceed
-                  ? "CAN PROCEED"
-                  : agent.canProceedReason.toUpperCase()
+              ? agent.canProceed
+                ? "CAN PROCEED"
+                : agent.canProceedReason.toUpperCase()
               : "—"
           }
-          alert={Boolean(agent && (agent.awaitingVerdict || !agent.canProceed))}
+          alert={Boolean(agent && !agent.canProceed)}
         />
       </dl>
     </Frame>

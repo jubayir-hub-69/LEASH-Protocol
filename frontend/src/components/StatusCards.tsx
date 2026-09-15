@@ -1,18 +1,17 @@
 import { Frame } from "./Frame";
+import { formatCountdown, formatUnix } from "@/lib/format";
 import type { AgentSnapshot } from "@/lib/types";
 
 export function StatusCards({ agent }: { agent: AgentSnapshot | null }) {
   const spend = agent?.spendCapUsd ?? "—";
-  const threat = agent?.threatScore ?? 0;
-  const threshold = agent?.threatThreshold ?? 10;
   const killActive = agent?.killSwitchStatus === "ACTIVE";
-  const threatRatio = threshold > 0 ? Math.min(threat / threshold, 1) : 0;
-  const threatTone =
-    killActive || threatRatio >= 1
-      ? "red"
-      : threatRatio >= 0.4
-        ? "amber"
-        : "green";
+  const expired = Boolean(agent?.expired);
+  const deadlineOpen = Boolean(agent?.deadlineOpen);
+  const deadlineValue = agent
+    ? deadlineOpen
+      ? "OPEN"
+      : formatCountdown(agent.deadline)
+    : "—";
 
   return (
     <section className="grid gap-4 md:grid-cols-3">
@@ -21,10 +20,10 @@ export function StatusCards({ agent }: { agent: AgentSnapshot | null }) {
         kicker="01"
         title="Current Spend Cap"
         value={spend}
-        hint="Remaining allowance the agent may still spend"
+        hint="On-chain spend_cap from the live leash.py contract"
         footer={
           agent
-            ? `Approved next spend ${agent.approvedNextSpendUsd} · nonce ${agent.nonce}`
+            ? `Raw spend_cap ${agent.spendCap} · ${agent.canProceed ? "gate open" : agent.canProceedReason}`
             : "Awaiting chain state"
         }
       >
@@ -32,18 +31,20 @@ export function StatusCards({ agent }: { agent: AgentSnapshot | null }) {
       </StatusCard>
 
       <StatusCard
-        tone={threatTone}
+        tone={expired ? "red" : deadlineOpen ? "green" : "amber"}
         kicker="02"
-        title="Agent Threat Score"
-        value={`${agent ? threat : "—"} / ${threshold}`}
-        hint="Warn points toward the kill-switch threshold"
+        title="Mandate Deadline"
+        value={deadlineValue}
+        hint="On-chain deadline. Zero means the mandate window is open-ended."
         footer={
           agent
-            ? `${agent.warningCount} warning${agent.warningCount === 1 ? "" : "s"} logged · last verdict ${agent.lastVerdict}`
+            ? deadlineOpen
+              ? "deadline = 0 · no expiry encoded on chain"
+              : `${formatUnix(agent.deadline)} UTC`
             : "Awaiting chain state"
         }
       >
-        <ThreatMeter value={threat} max={threshold} />
+        <DeadlineBar open={deadlineOpen} expired={expired} />
       </StatusCard>
 
       <StatusCard
@@ -51,12 +52,16 @@ export function StatusCards({ agent }: { agent: AgentSnapshot | null }) {
         kicker="03"
         title="Kill Switch Status"
         value={agent ? agent.killSwitchStatus : "—"}
-        hint={killActive ? "ERC-7710 delegation disabled" : "Active / Disabled"}
+        hint={
+          killActive
+            ? "Derived from spend_cap = 0 or a passed deadline"
+            : "Derived from live spend_cap and deadline"
+        }
         footer={
           agent
             ? killActive
-              ? "Agent paused · spend cap zeroed · second tx cannot leave"
-              : "Agent operational · caveat enforcer gate open"
+              ? agent.canProceedReason
+              : "Agent operational · spend_cap is live"
             : "Awaiting chain state"
         }
         pulse={killActive}
@@ -145,26 +150,18 @@ function CapBar({ empty }: { empty: boolean }) {
   );
 }
 
-function ThreatMeter({ value, max }: { value: number; max: number }) {
-  const ticks = Math.max(max, 1);
+function DeadlineBar({ open, expired }: { open: boolean; expired: boolean }) {
   return (
-    <div className="flex gap-1">
-      {Array.from({ length: ticks }).map((_, i) => {
-        const filled = i < value;
-        const critical = i >= ticks - 2;
-        return (
-          <span
-            key={i}
-            className={`h-2 flex-1 rounded-[1px] ${
-              filled
-                ? critical
-                  ? "bg-rose-500 shadow-[0_0_8px_#ff2d55]"
-                  : "bg-amber-400 shadow-[0_0_8px_#f5b942]"
-                : "bg-white/8"
-            }`}
-          />
-        );
-      })}
+    <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+      <div
+        className={`h-full ${
+          expired
+            ? "w-full bg-rose-500 shadow-[0_0_12px_#ff2d55]"
+            : open
+              ? "w-full bg-emerald-400 shadow-[0_0_12px_#00ff9c]"
+              : "w-[45%] bg-amber-400 shadow-[0_0_12px_#f5b942]"
+        }`}
+      />
     </div>
   );
 }
