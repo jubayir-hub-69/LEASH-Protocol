@@ -7,8 +7,8 @@
   "MockERC7710DelegationManager": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "verdictThreshold": 1,
   "threatThreshold": 10,
-  "timestamp": "2026-09-08T13:58:51.729Z",
-  "deployedAt": "2026-09-08T13:58:51.729Z",
+  "timestamp": "2026-09-08T14:52:06.795Z",
+  "deployedAt": "2026-09-08T14:52:06.795Z",
   "features": [
     "emergencyFreeze / appealAndUnfreeze (owner bypass of the AI jury)",
     "time-bound mandate deadline with automatic kill switch",

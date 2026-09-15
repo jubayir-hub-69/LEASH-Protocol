@@ -53,12 +53,12 @@ async function main() {
   console.log("Deploying leash.py to GenLayer Studio");
   console.log("  account:", account.address);
   console.log("  rpc:    ", studionet.rpcUrls.default.http[0]);
-  console.log("  args:   ", { mandate, spendCap, deadline });
+  console.log("  kwargs: ", { mandate, spend_cap: spendCap, deadline });
 
   const txHash = await client.deployContract({
     account,
     code,
-    args: [mandate, spendCap, deadline],
+    kwargs: { mandate, spend_cap: spendCap, deadline },
     leaderOnly: true,
   });
   console.log("  tx:     ", txHash);

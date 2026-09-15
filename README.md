@@ -9,7 +9,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs)](https://nextjs.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8?logo=tailwindcss)](https://tailwindcss.com/)
 [![Ethers.js](https://img.shields.io/badge/Ethers.js-6-2535A0)](https://docs.ethers.org/)
-[![GenLayer](https://img.shields.io/badge/GenLayer-Studio%2061999-7C3AED)](https://studio.genlayer.com/contracts)
+[![GenLayer](https://img.shields.io/badge/GenLayer-Studio%20Next%2061997-7C3AED)](https://studio-next.genlayer.com)
 [![ERC-7710](https://img.shields.io/badge/ERC--7710-Delegation%20Kill%20Switch-111827)](https://eips.ethereum.org/)
 [![Tests](https://img.shields.io/badge/Tests-33%2F33%20passing-22C55E)](#-quick-start--local-deployment)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -138,14 +138,18 @@ That is the product a principal actually needs at 2am: not a report, a **button 
 
 ## ⚙️ Tech Stack
 
+> ✅ **Deployed on GenLayer Studio Next (Chain ID: 61997) as per the final hackathon requirements.**
+>
+> Network: `studio_next` · RPC: `https://studio-next.genlayer.com/api` · Chain ID: `61997`
+
 | Layer | Choice | Why |
 | --- | --- | --- |
 | **Smart contracts** | Solidity `0.8.24` · OpenZeppelin `Ownable` + `ReentrancyGuard` | Production access control and reentrancy safety on the kill-switch path |
 | **Protocol standard** | **ERC-7710** delegation manager interface | Disable the live spending key — not just flip a boolean the wallet can ignore |
-| **Tooling** | Hardhat 2.22 · `@nomicfoundation/hardhat-toolbox` | Compile, 33 tests, local node, Studio + Bradbury networks |
+| **Tooling** | Hardhat 2.22 · `@nomicfoundation/hardhat-toolbox` | Compile, 33 tests, local node, Studio Next + Studio + Bradbury networks |
 | **Intelligent Contract** | `leash.py` on GenLayer Studio (chain ID `61999`) | Native GenLayer jury on the same mandate model |
 | **Command Center** | **Next.js 16** · **React 19** · **Tailwind CSS 4** · **Ethers.js 6** | Live dashboard + owner freeze/unfreeze against the local node |
-| **Networks** | Hardhat / localhost `31337` · GenLayer Studio `61999` · Bradbury `4221` | Demo locally; jury on GenLayer |
+| **Networks** | Hardhat / localhost `31337` · **GenLayer Studio Next `61997` (required)** · GenLayer Studio `61999` · Bradbury `4221` | Demo locally; **hackathon submission on Studio Next**; legacy Studio + Bradbury retained |
 
 **Tests: 33 / 33 passing.** Coverage includes registration, jury verdicts, ERC-7710 disable, owner freeze/appeal, deadlines, destination extraction + allowlist, milestones, and threat-score kill switch.
 
@@ -211,7 +215,20 @@ You should see the live agent: spend cap, threat score, mandate, and kill-switch
 
 > Local demo signer is Hardhat Account #0 only. It is **never** a mainnet key.
 
-### Optional — GenLayer Studio (the live jury)
+### Required — GenLayer Studio Next (hackathon submission)
+
+> ✅ **Deployed on GenLayer Studio Next (Chain ID: 61997) as per the final hackathon requirements.**
+
+Studio Next is the mandatory network for Agent Tank acceptance. It uses the latest GenLayer features, including fees.
+
+```bash
+# requires PRIVATE_KEY in a gitignored .env (funded with Studio Next testnet tokens)
+npx hardhat run scripts/deploy.js --network studio_next
+```
+
+Local `hardhat` / `localhost` and legacy `genlayer_studio` (chain ID `61999`) configs are unchanged.
+
+### Optional — GenLayer Studio (legacy live jury)
 
 The native Intelligent Contract is `leash.py` (mirrored at `contracts/leash.py`).
 
@@ -288,7 +305,7 @@ LEASH-Protocol/
 ├── studio_cases/                            # Continue / Warn / Revoke + interactive CLI
 ├── test/LEASH.test.js                       # 33 / 33
 ├── frontend/                                # Next.js Command Center
-└── hardhat.config.js                        # localhost · genlayer_studio · bradbury
+└── hardhat.config.js                        # localhost · studio_next · genlayer_studio · bradbury
 ```
 
 ### Core contract surface
@@ -315,7 +332,7 @@ LEASH-Protocol/
 | Network | Chain ID | Contract | Address | Timestamp |
 | --- | ---: | --- | --- | --- |
 | hardhat | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-06T05:24:23.481Z |
-| localhost | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-08T13:58:51.729Z |
+| localhost | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-08T14:52:06.795Z |
 <!-- DEPLOYED_ADDRESSES_END -->
 
 ### GenLayer Studio Intelligent Contract (`leash.py`)

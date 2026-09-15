@@ -35,6 +35,17 @@ module.exports = {
       gas: 8_000_000,
       gasPrice: 0,
     },
+    studio_next: {
+      url: "https://studio-next.genlayer.com/api",
+      chainId: 61997,
+      accounts: accountsFromEnv(),
+      // Studio's EVM wallet layer is gasless (eth_gasPrice = 0). Protocol
+      // fees are a separate Intelligent-Contract layer, not EIP-1559 gas.
+      // Pinning gas + gasPrice forces Hardhat to send legacy type-0 txs and
+      // skip eth_estimateGas, which this RPC rejects (block tag = extra param).
+      gas: 8_000_000,
+      gasPrice: 0,
+    },
     genlayer_bradbury: {
       url: "https://rpc.testnet-chain.genlayer.com",
       chainId: 4221,
