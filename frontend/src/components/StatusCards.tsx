@@ -20,10 +20,10 @@ export function StatusCards({ agent }: { agent: AgentSnapshot | null }) {
         kicker="01"
         title="Current Spend Cap"
         value={spend}
-        hint="On-chain spend_cap from the live leash.py contract"
+        hint="On-chain spend_cap after the last validator verdict"
         footer={
           agent
-            ? `Raw spend_cap ${agent.spendCap} · ${agent.canProceed ? "gate open" : agent.canProceedReason}`
+            ? `Raw spend_cap ${agent.spendCap} · verdict ${agent.lastVerdict} · ${agent.canProceed ? "gate open" : agent.canProceedReason}`
             : "Awaiting chain state"
         }
       >
@@ -54,14 +54,14 @@ export function StatusCards({ agent }: { agent: AgentSnapshot | null }) {
         value={agent ? agent.killSwitchStatus : "—"}
         hint={
           killActive
-            ? "Derived from spend_cap = 0 or a passed deadline"
-            : "Derived from live spend_cap and deadline"
+            ? "On-chain kill_switch / frozen / zero spend_cap from get_state"
+            : "On-chain kill_switch is false and spend_cap is live"
         }
         footer={
           agent
             ? killActive
               ? agent.canProceedReason
-              : "Agent operational · spend_cap is live"
+              : `Agent operational · last verdict ${agent.lastVerdict}`
             : "Awaiting chain state"
         }
         pulse={killActive}

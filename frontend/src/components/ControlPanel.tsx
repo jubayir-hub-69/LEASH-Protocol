@@ -4,16 +4,20 @@ import { useState } from "react";
 import { Frame } from "./Frame";
 import { FALLBACK_LEASH_ADDRESS } from "@/lib/config";
 import { shortenAddress } from "@/lib/format";
-import type { AgentSnapshot } from "@/lib/types";
+import type { AgentSnapshot, JuryWriteResult } from "@/lib/types";
 
 export function ControlPanel({
   agent,
   onRefresh,
+  onApplied,
 }: {
   agent: AgentSnapshot | null;
   onRefresh: () => Promise<void>;
+  onApplied: (state: AgentSnapshot) => void;
 }) {
   const [refreshing, setRefreshing] = useState(false);
+  const [busy, setBusy] = useState<"freeze" | "unfreeze" | null>(null);
+  const [lastWrite, setLastWrite] = useState<JuryWriteResult | null>(null);
   const frozen = agent?.killSwitchStatus === "ACTIVE";
   const contractAddress = agent?.contractAddress ?? FALLBACK_LEASH_ADDRESS;
 
@@ -24,6 +28,36 @@ export function ControlPanel({
       await onRefresh();
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  async function control(action: "freeze" | "unfreeze") {
+    if (busy) return;
+    setBusy(action);
+    setLastWrite(null);
+    try {
+      const response = await fetch("/api/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          action === "unfreeze"
+            ? { action, newSpendCap: 200 }
+            : { action }
+        ),
+      });
+      const payload = (await response.json()) as JuryWriteResult;
+      setLastWrite(payload);
+      if (payload.ok && payload.state) onApplied(payload.state);
+    } catch (error) {
+      setLastWrite({
+        ok: false,
+        functionName:
+          action === "freeze" ? "emergency_freeze" : "appeal_and_unfreeze",
+        error: "Dashboard could not reach /api/control",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -49,9 +83,10 @@ export function ControlPanel({
             Live Intelligent Contract
           </h2>
           <p className="mt-1 max-w-2xl font-mono text-[11px] leading-relaxed text-slate-500">
-            The deployed leash.py contract exposes storage variables only:
-            mandate, spend_cap, and deadline. Schema reports {agent ? agent.methodCount : "—"} public
-            methods, so owner freeze/unfreeze writes are not available on this network.
+            Dashboard calls the Python contract API through genlayer-js:
+            `get_state`, `adjudicate`, `emergency_freeze`,
+            `appeal_and_unfreeze`. Schema reports {agent ? agent.methodCount : "—"}{" "}
+            public methods.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 font-mono text-[10px] tracking-widest text-slate-500">
@@ -68,7 +103,7 @@ export function ControlPanel({
                 : "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
             }`}
           >
-            {frozen ? "OVERRIDE: LOCKED" : "OVERRIDE: LIVE READ"}
+            {frozen ? "KILL SWITCH ACTIVE" : "GATE OPEN"}
           </span>
         </div>
       </div>
@@ -77,31 +112,61 @@ export function ControlPanel({
         <StateTile label="MANDATE" value={agent?.mandate ?? "—"} />
         <StateTile label="SPEND_CAP" value={agent?.spendCapUsd ?? "—"} />
         <StateTile
-          label="DEADLINE"
-          value={
-            agent
-              ? agent.deadlineOpen
-                ? "0 (OPEN)"
-                : String(agent.deadline)
-              : "—"
-          }
+          label="LAST_VERDICT"
+          value={agent?.lastVerdict && agent.lastVerdict !== "NONE" ? agent.lastVerdict : "NONE"}
         />
       </div>
 
+      {agent?.methods?.length ? (
+        <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-wide text-slate-500">
+          ABI {agent.methods.join(" · ")}
+        </p>
+      ) : null}
+
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          type="button"
-          disabled={refreshing}
-          onClick={() => void refresh()}
-          className="border border-emerald-400/45 bg-emerald-500/10 px-5 py-3 text-left font-mono text-[11px] tracking-[0.22em] text-emerald-200 transition hover:border-emerald-300/70 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {refreshing ? "READING STUDIO NEXT…" : "REFRESH ON-CHAIN STATE"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={refreshing || Boolean(busy)}
+            onClick={() => void refresh()}
+            className="border border-emerald-400/45 bg-emerald-500/10 px-5 py-3 text-left font-mono text-[11px] tracking-[0.22em] text-emerald-200 transition hover:border-emerald-300/70 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {refreshing ? "READING GET_STATE…" : "REFRESH ON-CHAIN STATE"}
+          </button>
+          <button
+            type="button"
+            disabled={Boolean(busy) || Boolean(agent?.frozen)}
+            onClick={() => void control("freeze")}
+            className="border border-rose-400/45 bg-rose-500/10 px-5 py-3 text-left font-mono text-[11px] tracking-[0.22em] text-rose-200 transition hover:border-rose-300/70 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy === "freeze" ? "FREEZING…" : "EMERGENCY FREEZE"}
+          </button>
+          <button
+            type="button"
+            disabled={Boolean(busy)}
+            onClick={() => void control("unfreeze")}
+            className="border border-cyan-400/45 bg-cyan-500/10 px-5 py-3 text-left font-mono text-[11px] tracking-[0.22em] text-cyan-200 transition hover:border-cyan-300/70 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy === "unfreeze" ? "RESTORING…" : "APPEAL + UNFREEZE $200"}
+          </button>
+        </div>
         <p className="font-mono text-[11px] leading-relaxed text-slate-500">
-          Reads go through genlayer-js `readContract` / `gen_call` against
-          https://studio-next.genlayer.com/api (chain 61997).
+          Reads `get_state`. Writes wait for Studio Next finality, then read the
+          mutated spend_cap / kill_switch / last_verdict back.
         </p>
       </div>
+
+      {lastWrite ? (
+        <p
+          className={`mt-4 font-mono text-[11px] ${
+            lastWrite.ok ? "text-emerald-300" : "text-rose-300"
+          }`}
+        >
+          {lastWrite.ok
+            ? `${lastWrite.functionName} finalized · ${lastWrite.txHash ?? ""}`
+            : `${lastWrite.error}${lastWrite.detail ? ` — ${lastWrite.detail}` : ""}`}
+        </p>
+      ) : null}
     </Frame>
   );
 }

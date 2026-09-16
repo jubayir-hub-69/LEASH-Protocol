@@ -17,8 +17,21 @@ export type AgentSnapshot = {
   canProceed: boolean;
   canProceedReason: string;
   killSwitchStatus: KillSwitchStatus;
+  killSwitch: boolean;
+  frozen: boolean;
+  lastVerdict: string;
+  lastReason: string;
+  lastAction: string;
+  lastReceipts: string;
+  lastSpend: string;
+  approvedNextSpend: string;
+  threatScore: string;
+  threatThreshold: string;
+  submissionCount: string;
+  owner: string;
   constructorParams: string[];
   methodCount: number;
+  methods: string[];
   fetchedAt: string;
 };
 
@@ -33,3 +46,14 @@ export type AgentError = {
 };
 
 export type AgentResponse = AgentSnapshot | AgentError;
+
+export type JuryWriteResult = {
+  ok: boolean;
+  functionName: string;
+  txHash?: string;
+  status?: string;
+  result?: string;
+  state?: AgentSnapshot;
+  error?: string;
+  detail?: string;
+};

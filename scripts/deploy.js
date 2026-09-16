@@ -140,7 +140,7 @@ async function readNativeBalance(provider, address) {
 }
 
 const STUDIO_NEXT_RPC = "https://studio-next.genlayer.com/api";
-const LEASH_PY_PATH = path.join(__dirname, "..", "leash.py");
+const LEASH_PY_PATH = path.join(__dirname, "..", "genlayer-studio", "leash.py");
 const DEFAULT_MANDATE = "spend at most $200 on a flight that lands before 6pm.";
 
 function loadPrivateKey() {
@@ -308,6 +308,20 @@ async function deployStudioNextIntelligentContract() {
     throw new Error("Studio Next deploy finalized without a contract address");
   }
 
+  try {
+    const schema = await client.getContractSchema(contractAddress);
+    const methods = Object.keys(schema?.methods || {});
+    console.log("  schema methods:", methods.join(", ") || "(none)");
+    if (!methods.includes("adjudicate") || !methods.includes("get_state")) {
+      throw new Error(
+        "Deployed schema is missing adjudicate/get_state. This is a constructor-only contract."
+      );
+    }
+  } catch (err) {
+    if (String(err.message || err).includes("constructor-only")) throw err;
+    console.log("  schema read skipped:", err.message || err);
+  }
+
   const timestamp = new Date().toISOString();
   const existing = loadExistingAddresses();
   const deployedAddresses = {
@@ -326,11 +340,11 @@ async function deployStudioNextIntelligentContract() {
     timestamp,
     deployedAt: timestamp,
     features: [
-      "emergencyFreeze / appealAndUnfreeze (owner bypass of the AI jury)",
-      "time-bound mandate deadline with automatic kill switch",
-      "milestone-based spendCap unlocking (UnlockMilestone verdict)",
-      "strict destination allowlist + on-chain receipt extraction",
-      "dynamic threat score; kill switch at threatThreshold (default 10)",
+      "adjudicate() GenLayer LLM mandate jury (eq_principle.prompt_comparative)",
+      "validator-agreed verdict writes last_verdict, spend_cap, kill_switch",
+      "get_state / get_last_verdict / can_proceed view API for the dashboard",
+      "emergency_freeze / appeal_and_unfreeze owner path",
+      "dynamic threat score; kill switch at threat_threshold (default 10)",
     ],
   };
   if (existing.genlayerStudio) {

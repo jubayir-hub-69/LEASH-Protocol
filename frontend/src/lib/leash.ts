@@ -6,8 +6,15 @@ import {
   STUDIO_NEXT_RPC,
 } from "./config";
 import { formatUsd } from "./format";
-import { createLeashClient, readLeashStorage } from "./genlayer";
-import type { AgentResponse } from "./types";
+import {
+  createLeashClient,
+  readLeashSchema,
+  readLeashState,
+  writeLeashAndWait,
+  type HexAddress,
+  type LeashOnChainState,
+} from "./genlayer";
+import type { AgentResponse, AgentSnapshot, JuryWriteResult } from "./types";
 
 type DeployedFile = {
   LEASH?: string;
@@ -39,21 +46,65 @@ export function loadLeashAddress(): { address: string; source: string } {
   return { address: FALLBACK_LEASH_ADDRESS, source: "studio-next-fallback" };
 }
 
-function constructorParamNames(schema: unknown): string[] {
-  const ctor = (schema as { ctor?: { params?: unknown } } | null)?.ctor;
-  const params = ctor?.params;
-  if (!Array.isArray(params)) return [];
-  return params
-    .map((entry) => (Array.isArray(entry) ? String(entry[0] ?? "") : ""))
-    .filter(Boolean);
-}
+let cachedSchema: { methods: string[]; constructorParams: string[] } | null =
+  null;
 
-let cachedSchema: unknown = null;
+function snapshotFromState(
+  state: LeashOnChainState,
+  address: string,
+  source: string,
+  schema: { methods: string[]; constructorParams: string[] }
+): AgentSnapshot {
+  const deadlineSeconds = Number(state.deadline);
+  const deadlineOpen = deadlineSeconds === 0;
+  const expired = !deadlineOpen && deadlineSeconds * 1000 <= Date.now();
+  const capIsZero = state.spendCap === BigInt(0);
+  const killSwitch = state.killSwitch || state.frozen || capIsZero;
+  const canProceed = state.canProceed && !expired && !killSwitch;
+  const canProceedReason = state.frozen
+    ? "owner freeze is active"
+    : state.killSwitch
+      ? `jury verdict ${state.lastVerdict || "REVOKE"} fired the kill switch`
+      : capIsZero
+        ? "spend_cap is zero"
+        : expired
+          ? "deadline has passed"
+          : "jury gate is open";
 
-function methodCount(schema: unknown): number {
-  const methods = (schema as { methods?: Record<string, unknown> } | null)
-    ?.methods;
-  return methods ? Object.keys(methods).length : 0;
+  return {
+    ok: true,
+    connected: true,
+    rpc: STUDIO_NEXT_RPC,
+    chainId: CHAIN_ID,
+    blockNumber: null,
+    contractAddress: address,
+    addressSource: source,
+    mandate: state.mandate,
+    spendCap: state.spendCap.toString(),
+    spendCapUsd: formatUsd(state.spendCap),
+    deadline: deadlineSeconds,
+    deadlineOpen,
+    expired,
+    canProceed,
+    canProceedReason,
+    killSwitchStatus: killSwitch ? "ACTIVE" : "DISABLED",
+    killSwitch,
+    frozen: state.frozen,
+    lastVerdict: state.lastVerdict,
+    lastReason: state.lastReason,
+    lastAction: state.lastAction,
+    lastReceipts: state.lastReceipts,
+    lastSpend: state.lastSpend.toString(),
+    approvedNextSpend: state.approvedNextSpend.toString(),
+    threatScore: state.threatScore.toString(),
+    threatThreshold: state.threatThreshold.toString(),
+    submissionCount: state.submissionCount.toString(),
+    owner: state.owner,
+    constructorParams: schema.constructorParams,
+    methodCount: schema.methods.length,
+    methods: schema.methods,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export async function fetchAgentSnapshot(): Promise<AgentResponse> {
@@ -63,54 +114,27 @@ export async function fetchAgentSnapshot(): Promise<AgentResponse> {
 
   try {
     const client = createLeashClient();
-    const contractAddress = address as `0x${string}`;
+    const contractAddress = address as HexAddress;
+    const state = await readLeashState(client, contractAddress);
 
-    const { mandate, spendCap, deadline } = await readLeashStorage(
-      client,
-      contractAddress
-    );
-
-    let schema: unknown = cachedSchema;
-    if (!schema) {
+    if (!cachedSchema) {
       try {
-        schema = await client.getContractSchema(contractAddress);
-        cachedSchema = schema;
+        cachedSchema = await readLeashSchema(client, contractAddress);
       } catch {
-        schema = { ctor: { params: [] }, methods: {} };
+        cachedSchema = {
+          methods: [
+            "get_state",
+            "get_mandate",
+            "adjudicate",
+            "emergency_freeze",
+            "appeal_and_unfreeze",
+          ],
+          constructorParams: ["mandate", "spend_cap", "deadline"],
+        };
       }
     }
 
-    const deadlineSeconds = Number(deadline);
-    const deadlineOpen = deadlineSeconds === 0;
-    const expired = !deadlineOpen && deadlineSeconds * 1000 <= Date.now();
-    const capIsZero = spendCap === BigInt(0);
-    const canProceed = !capIsZero && !expired;
-
-    return {
-      ok: true,
-      connected: true,
-      rpc,
-      chainId: CHAIN_ID,
-      blockNumber: null,
-      contractAddress,
-      addressSource: source,
-      mandate,
-      spendCap: spendCap.toString(),
-      spendCapUsd: formatUsd(spendCap),
-      deadline: deadlineSeconds,
-      deadlineOpen,
-      expired,
-      canProceed,
-      canProceedReason: capIsZero
-        ? "spend_cap is zero"
-        : expired
-          ? "deadline has passed"
-          : "spend_cap is live and deadline is open",
-      killSwitchStatus: canProceed ? "DISABLED" : "ACTIVE",
-      constructorParams: constructorParamNames(schema),
-      methodCount: methodCount(schema),
-      fetchedAt,
-    };
+    return snapshotFromState(state, contractAddress, source, cachedSchema);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const offline =
@@ -128,6 +152,45 @@ export async function fetchAgentSnapshot(): Promise<AgentResponse> {
         : "Failed to read LEASH state from Studio Next",
       detail: message,
       fetchedAt,
+    };
+  }
+}
+
+export async function submitLeashWrite(args: {
+  functionName: "adjudicate" | "emergency_freeze" | "appeal_and_unfreeze";
+  callArgs: Array<string | number | boolean>;
+}): Promise<JuryWriteResult> {
+  const { address, source } = loadLeashAddress();
+  try {
+    const client = createLeashClient(true);
+    const write = await writeLeashAndWait(client, {
+      address: address as HexAddress,
+      functionName: args.functionName,
+      callArgs: args.callArgs,
+    });
+    const state = await readLeashState(client, address as HexAddress);
+    if (!cachedSchema) {
+      try {
+        cachedSchema = await readLeashSchema(client, address as HexAddress);
+      } catch {
+        cachedSchema = { methods: [], constructorParams: [] };
+      }
+    }
+    return {
+      ok: true,
+      functionName: args.functionName,
+      txHash: write.hash,
+      status: write.status,
+      result: write.result,
+      state: snapshotFromState(state, address, source, cachedSchema),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      functionName: args.functionName,
+      error: `Failed to call ${args.functionName} on Studio Next`,
+      detail: message,
     };
   }
 }

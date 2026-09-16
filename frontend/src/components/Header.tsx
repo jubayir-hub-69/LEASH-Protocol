@@ -51,7 +51,7 @@ export function Header({
             <LeashMark />
             <div>
               <p className="font-mono text-[10px] tracking-[0.38em] text-emerald-400/80">
-                PROTOCOL v0.1 · ERC-7710 GATE
+                PROTOCOL v0.2 · GENLAYER MANDATE JURY
               </p>
               <h1 className="mt-1 font-sans text-lg font-semibold tracking-[0.12em] text-emerald-50 sm:text-2xl md:text-[1.65rem]">
                 LEASH - AI Agent Security Command Center

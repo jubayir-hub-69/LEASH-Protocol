@@ -15,16 +15,16 @@
 > You need a leash — a mandate, a spend cap, and a deadline that live on GenLayer, not in a server log.
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                                                                          │
-│   HUMAN MANDATE              ON-CHAIN STATE             COMMAND CENTER   │
-│   "≤ $200, lands             mandate                    Next.js reads    │
-│    before 6pm."              spend_cap                  live via         │
-│         │                    deadline                   genlayer-js      │
-│         └────────────── LEASH PROTOCOL ─────────────────┘                │
-│                     studio_next · chain 61997                            │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│   HUMAN MANDATE          GENLAYER JURY            COMMAND CENTER             │
+│   "≤ $200, lands         adjudicate()             get_state()                │
+│    before 6pm."          validators agree         last_verdict               │
+│         │                on CONTINUE/REVOKE       spend_cap                  │
+│         └────────────── LEASH PROTOCOL ────────── kill_switch ─────────────┘ │
+│                     studio_next · chain 61997                                │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -33,7 +33,7 @@
 
 Autonomous agents are about to spend other people's money. That is the Agent Tank thesis: agents that book, trade, pay, and settle without a human in the loop. The moment those agents hold live keys, static spend caps and post-hoc logs are not enough.
 
-**LEASH** is an AI Agent Security Command Center. A principal writes a natural-language job — *spend at most $200 on a flight that lands before 6pm* — and that job is stored on GenLayer as the agent's binding terms. The Command Center reads those terms live from the Intelligent Contract. There is no mock feed and no reconstructed ABI.
+**LEASH** is an AI Agent Security Command Center. A principal writes a natural-language job — *spend at most $200 on a flight that lands before 6pm* — and that job is stored on GenLayer as the agent's binding terms. After every proposed spend the agent calls `adjudicate()`. Studio Next validators run an LLM jury, agree on a verdict, and that verdict **changes contract state**. The Command Center reads the new `last_verdict`, `spend_cap`, and `kill_switch` back through `get_state()`. There is no mock feed and no Solidity ABI.
 
 This is not a vault. This is not an escrow. The key is already in the agent's wallet. LEASH is the on-chain record of **what the agent is allowed to do**, so a decentralized jury can later answer the only question that matters between transaction N and transaction N+1:
 
@@ -49,7 +49,7 @@ Judges: the Intelligent Contract running on `studio_next` is the Python file in 
 
 **[`genlayer-studio/leash.py`](./genlayer-studio/leash.py)**
 
-That file is the exact source deployed to Studio Next. Same bytecode family, same constructor, same storage layout. Identical copies also live at the repo root (`leash.py`, used by `scripts/deploy.js`) and at `contracts/leash.py`.
+That file is the exact source to deploy to Studio Next. Identical copies also live at the repo root (`leash.py`) and at `contracts/leash.py`. `scripts/deploy.js --network studio_next` deploys **this** file.
 
 | | |
 | --- | --- |
@@ -57,24 +57,24 @@ That file is the exact source deployed to Studio Next. Same bytecode family, sam
 | **Chain ID** | `61997` |
 | **RPC** | `https://studio-next.genlayer.com/api` |
 | **Contract** | [`genlayer-studio/leash.py`](./genlayer-studio/leash.py) |
-| **Address** | [`0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F`](https://studio-next.genlayer.com) |
-| **Deploy tx** | `0xbb9aab16ecfb85d38b50d0c59cfdafa46912b56bc4048f547d907f9e592bff9f` |
-| **Status** | `FINALIZED` |
 | **Constructor** | `mandate = "spend at most $200 on a flight that lands before 6pm."` · `spend_cap = 200` · `deadline = 0` |
 
-```python
-class Contract(gl.contract.Contract):
-    mandate: str
-    spend_cap: u256
-    deadline: u256
+**Live address:** [`0x9d18d260f048873B119EB2E5a3b56f493CF8398a`](https://studio-next.genlayer.com) · deploy tx `0x4ab4ef9926ea37a54395d65fcb04d8c06d98779c1855e6f8da07bfe2526a6e5e`. Schema includes `adjudicate` and `get_state`. The previous constructor-only addresses are retired.
 
-    def __init__(self, mandate: str, spend_cap: int, deadline: int):
-        self.mandate = mandate
-        self.spend_cap = spend_cap
-        self.deadline = deadline
+```python
+@gl.public.write
+def adjudicate(self, proposed_action: str, spend_amount: int, receipts: str) -> None:
+    raw = gl.eq_principle.prompt_comparative(
+        get_jury_answer, "The value of verdict has to match"
+    )
+    # validator-agreed verdict mutates last_verdict, spend_cap, kill_switch
+
+@gl.public.view
+def get_state(self) -> dict[str, typing.Any]:
+    return self._snapshot()
 ```
 
-The Next.js Command Center connects with official **genlayer-js**, talks to `https://studio-next.genlayer.com/api`, and reads those three storage variables from this address. What the dashboard shows is what the chain stores.
+The Next.js Command Center connects with official **genlayer-js**, talks to `https://studio-next.genlayer.com/api`, calls those Python methods, and renders whatever the chain stored after consensus.
 
 ---
 
@@ -82,21 +82,30 @@ The Next.js Command Center connects with official **genlayer-js**, talks to `htt
 
 ### Does the app call a real GenLayer contract?
 
-**Yes.** The Command Center does not use a mock, a fixture, or a reconstructed EVM ABI for Studio Next.
+**Yes.** The Command Center talks to the Python Intelligent Contract through official **genlayer-js**. It does not use a Solidity ABI, `getAgent`, or decoded raw storage.
 
-- Frontend route: `frontend/src/app/api/agent/route.ts`
-- SDK client: `frontend/src/lib/genlayer.ts` (`createClient` from `genlayer-js`, chain id `61997`, endpoint `https://studio-next.genlayer.com/api`)
-- Snapshot: `frontend/src/lib/leash.ts` reads the live contract at `0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F`
-- Schema is fetched with `client.getContractSchema` (`ctor` params `mandate`, `spend_cap`, `deadline`; public methods: none)
-- State is read through genlayer-js `readContract` / `gen_call` and decoded from the contract's `contract_state`
+- Read: `frontend/src/app/api/agent/route.ts` → `client.readContract({ functionName: "get_state" })`
+- Write: `frontend/src/app/api/jury/route.ts` → `client.writeContract({ functionName: "adjudicate" })`
+- Wait: `waitForTransactionReceipt({ waitUntil: "finalized" })` then read `get_state` again
+- SDK client: `frontend/src/lib/genlayer.ts` (`createClient`, chain id `61997`, endpoint `https://studio-next.genlayer.com/api`)
+- Schema: `client.getContractSchema` must list `adjudicate`, `get_state`, `emergency_freeze`, `appeal_and_unfreeze`
 
-Verified live values on Studio Next:
+| Method | Kind | What the dashboard does with it |
+| --- | --- | --- |
+| `get_state` | view | Polls mandate, cap, last verdict, kill switch |
+| `adjudicate` | write | Submits a proposed spend to the validator jury |
+| `emergency_freeze` | write | Owner kill switch |
+| `appeal_and_unfreeze` | write | Owner restore |
 
-| State variable | On-chain value |
+Live contract after a validator-finalized in-mandate case (`0x73fa9b46baac3b8cf0a1c7a74dc1780d85cc4a61052bf97de16dee7936de9842`):
+
+| State | After jury |
 | --- | --- |
-| `mandate` | `spend at most $200 on a flight that lands before 6pm.` |
-| `spend_cap` | `200` |
-| `deadline` | `0` (open-ended) |
+| `last_verdict` | `CONTINUE` |
+| `spend_cap` | `14` (was `200`) |
+| `approved_next_spend` | `186` |
+| `kill_switch` | `false` |
+| `last_reason` | Economy SFO-JFK flight LE-441 lands 17:40 before 6pm and costs $186 under the $200 cap. |
 
 ### Why does decentralized judgment matter to this problem?
 
@@ -112,28 +121,31 @@ GenLayer is the adjudication layer for that class of dispute. Independent valida
 
 ### Does the contract maintain meaningful state?
 
-**Yes.** The deployed Intelligent Contract persists the three fields that define the leash:
+**Yes.** Constructor terms are only the starting leash. A validator-decided verdict mutates live fields the dashboard reads back:
 
 | Variable | Type | Meaning |
 | --- | --- | --- |
 | `mandate` | `str` | Natural-language job the agent is bound to |
-| `spend_cap` | `u256` | Maximum the agent may spend (`200` on the live deploy) |
+| `spend_cap` | `u256` | Remaining spend allowance; jury can reduce it to 0 |
 | `deadline` | `u256` | Mandate window; `0` means open-ended |
+| `last_verdict` | `str` | `CONTINUE` / `WARN` / `CONSTRAIN` / `REVOKE` from the jury |
+| `last_reason` | `str` | One-sentence validator rationale |
+| `kill_switch` | `bool` | Set by `REVOKE`, threat threshold, or owner freeze |
+| `threat_score` | `u256` | Accumulates on `WARN` / `CONSTRAIN` |
+| `submission_count` | `u256` | Number of jury decisions applied |
 
-That state is not decorative. It is the on-chain source of truth the Command Center renders: the mandate quote, the `$200.00` spend cap, and the open deadline. If those fields were missing, there would be no leash — only a UI.
+That is the proof the steward asked for: a validator-decided mandate result changes contract state, and the app reads it back.
 
 ---
 
 ## Technical Highlights (no mock data)
 
-The Studio Next integration is a real Intelligent Contract read path, not a leftover Hardhat demo.
+1. **Working GenLayer mandate jury.** `adjudicate()` runs `gl.nondet.exec_prompt` inside `gl.eq_principle.prompt_comparative` so validators must agree on `verdict` before state changes.
+2. **Dashboard calls the actual Python API.** `get_state`, `adjudicate`, `emergency_freeze`, `appeal_and_unfreeze`. No Solidity method names.
+3. **Write → finality → read-back.** `/api/jury` waits until `FINALIZED`, then calls `get_state` and returns the new `last_verdict` / `spend_cap` / `kill_switch` to the UI.
+4. **Preset cases.** In-mandate flight (`CONTINUE`), hotel drift (`REVOKE`), overspend + late arrival (`REVOKE`).
 
-1. **Migrated from legacy EVM calls to genlayer-js.** The dashboard no longer talks to `leash.py` as if it were Solidity.
-2. **Removed obsolete `getAgent` logic.** The Python contract has no `getAgent` method. The old ethers/ABI decode path was the red `Failed to read Agent ID 1 from LEASH` banner. It is gone.
-3. **Stopped terminal RPC spam.** `eth_blockNumber` is an EVM method. Calling it on `studio_next` produced `GenLayer RPC error (eth_blockNumber): fetch failed` and `/api/agent` 503s that could blank the UI. That call is removed. Polling waits **15 seconds after each finished request**.
-4. **100% authentic on-chain reading.** Mandate, spend cap, and deadline on the Command Center come from the finalized Studio Next contract at `0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F`. Constructor args are not substituted for live state.
-
-The repo also contains a Hardhat / Solidity protocol prototype (`contracts/LEASH.sol`) with **33 / 33** tests for a local jury, ERC-7710 kill switch, and owner freeze path. That suite is for local development. **The hackathon deployment on `studio_next` is [`genlayer-studio/leash.py`](./genlayer-studio/leash.py).**
+The repo also contains a Hardhat / Solidity protocol prototype (`contracts/LEASH.sol`) with **33 / 33** tests. That suite is local-only. **The hackathon deployment on `studio_next` is [`genlayer-studio/leash.py`](./genlayer-studio/leash.py).**
 
 ---
 
@@ -149,7 +161,45 @@ cd LEASH-Protocol
 npm install
 ```
 
-### Run the Command Center (reads live Studio Next)
+### Deploy the mandate jury to Studio Next
+
+1. Fund the deployer on [Studio Next](https://studio-next.genlayer.com) (chain ID `61997`). Canonical RPC: `https://studio-next.genlayer.com/api` (alias of studio-dev).
+2. Put the funded key in the repo-root `.env`:
+
+```
+PRIVATE_KEY=0xyourkey
+```
+
+3. Deploy [`genlayer-studio/leash.py`](./genlayer-studio/leash.py):
+
+```bash
+npm run deploy:studio-next
+```
+
+This writes the new address to `deployed_addresses.json` and the README table. Confirm `getContractSchema` lists `adjudicate` and `get_state`. If it only shows the constructor, the wrong file was deployed.
+
+4. Seed a validator-decided verdict so the dashboard has a real result to read back:
+
+```bash
+npm run jury:seed
+# optional second case that should REVOKE:
+node scripts/adjudicate.mjs overspend
+```
+
+Consensus takes 1–3 minutes. Success prints `last_verdict` from `get_state`.
+
+5. Point the Command Center at the new address (`frontend/.env.local`):
+
+```
+NEXT_PUBLIC_RPC_URL=https://studio-next.genlayer.com/api
+NEXT_PUBLIC_CHAIN_ID=61997
+NEXT_PUBLIC_CONTRACT_ADDRESS=0xYourNewAddress
+NEXT_PUBLIC_LEASH_ADDRESS=0xYourNewAddress
+```
+
+The API routes also read `PRIVATE_KEY` from the repo-root `.env` so jury writes can be signed.
+
+### Run the Command Center
 
 ```bash
 cd frontend
@@ -157,7 +207,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The dashboard connects to `https://studio-next.genlayer.com/api` (chain ID `61997`) and displays the live `mandate`, `spend_cap`, and `deadline` from `0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F`.
+Open [http://localhost:3000](http://localhost:3000). Click a mandate-jury case. The UI submits `adjudicate`, waits for Studio Next finality, then re-renders `last_verdict`, `spend_cap`, and the kill switch from `get_state`.
 
 ### Run the Hardhat test suite
 
@@ -185,7 +235,7 @@ This path deploys `LEASH.sol` to a local node. It is not the Studio Next submiss
 
 | Layer | Choice |
 | --- | --- |
-| **Intelligent Contract (submission)** | [`genlayer-studio/leash.py`](./genlayer-studio/leash.py) on **studio_next** (chain ID `61997`) |
+| **Intelligent Contract (submission)** | [`genlayer-studio/leash.py`](./genlayer-studio/leash.py) mandate jury on **studio_next** (chain ID `61997`) |
 | **Command Center** | Next.js 16 · React 19 · Tailwind CSS 4 |
 | **Chain SDK** | official `genlayer-js` `^2.0.0-rc.1` |
 | **Local protocol prototype** | Solidity `0.8.24` · Hardhat 2.22 · OpenZeppelin · 33 tests |
@@ -203,7 +253,8 @@ LEASH-Protocol/
 │   ├── LEASH.sol                # local Hardhat prototype (not the studio_next deploy)
 │   └── ...
 ├── frontend/                    # Next.js Command Center (genlayer-js → studio_next)
-├── scripts/deploy.js            # studio_next deploy of leash.py
+├── scripts/deploy.js            # studio_next deploy of genlayer-studio/leash.py
+├── scripts/adjudicate.mjs       # seed a validator jury verdict and read it back
 ├── test/LEASH.test.js           # 33 / 33 Hardhat tests
 └── deployed_addresses.json      # live studio_next address + tx
 ```
@@ -215,12 +266,12 @@ LEASH-Protocol/
 | --- | ---: | --- | --- | --- |
 | hardhat | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-06T05:24:23.481Z |
 | localhost | 31337 | LEASH | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | 2026-09-08T14:52:06.795Z |
-| studio_next | 61997 | LEASH | `0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F` | 2026-09-15T11:20:08.007Z |
+| studio_next | 61997 | LEASH | `0x9d18d260f048873B119EB2E5a3b56f493CF8398a` | 2026-09-16T05:19:12.710Z |
 <!-- DEPLOYED_ADDRESSES_END -->
 
 | Network | Chain ID | Contract | Address | Deploy tx |
 | --- | ---: | --- | --- | --- |
-| **studio_next** | **61997** | **leash.py** | **`0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F`** | `0xbb9aab16ecfb85d38b50d0c59cfdafa46912b56bc4048f547d907f9e592bff9f` |
+| **studio_next** | **61997** | **leash.py** | **`0x9d18d260f048873B119EB2E5a3b56f493CF8398a`** | `0x4ab4ef9926ea37a54395d65fcb04d8c06d98779c1855e6f8da07bfe2526a6e5e` |
 | genlayer_studio (legacy) | 61999 | leash.py | `0x3bba2d2d84a95006084aFabc0F02a6dE472D57A4` | `0x91e06782a1662b7b26b5119a2740a147a1795b3568f25754c7866551ec06d997` |
 
 ---

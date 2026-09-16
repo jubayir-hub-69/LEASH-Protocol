@@ -14,7 +14,7 @@ export function MandatePanel({ agent }: { agent: AgentSnapshot | null }) {
             Current Mandate
           </h2>
           <p className="mt-1 font-mono text-[11px] text-slate-500">
-            Live `mandate` string stored on the Studio Next Intelligent Contract
+            Live `mandate` from `get_state` on the Studio Next Intelligent Contract
           </p>
         </div>
         {agent ? (
@@ -44,12 +44,13 @@ export function MandatePanel({ agent }: { agent: AgentSnapshot | null }) {
           }
         />
         <Fact
-          label="Constructor"
+          label="Last verdict"
           value={
-            agent?.constructorParams.length
-              ? agent.constructorParams.join(" · ")
-              : "—"
+            agent?.lastVerdict && agent.lastVerdict !== "NONE"
+              ? agent.lastVerdict
+              : "NONE"
           }
+          alert={agent?.lastVerdict === "REVOKE"}
         />
         <Fact
           label="Jury gate"

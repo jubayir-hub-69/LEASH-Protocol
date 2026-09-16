@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ControlPanel } from "./ControlPanel";
 import { Header } from "./Header";
+import { JuryPanel } from "./JuryPanel";
 import { MandatePanel } from "./MandatePanel";
 import { StatusCards } from "./StatusCards";
 import { POLL_INTERVAL_MS } from "@/lib/config";
-import type { AgentResponse } from "@/lib/types";
+import type { AgentResponse, AgentSnapshot } from "@/lib/types";
 
 export function Dashboard() {
   const [data, setData] = useState<AgentResponse | null>(null);
@@ -37,6 +38,11 @@ export function Dashboard() {
     } finally {
       inflight.current = false;
     }
+  }, []);
+
+  const applyState = useCallback((state: AgentSnapshot) => {
+    ++loadSeq.current;
+    setData(state);
   }, []);
 
   useEffect(() => {
@@ -92,11 +98,12 @@ export function Dashboard() {
 
         <StatusCards agent={agent} />
         <MandatePanel agent={agent} />
-        <ControlPanel agent={agent} onRefresh={load} />
+        <JuryPanel agent={agent} onApplied={applyState} />
+        <ControlPanel agent={agent} onRefresh={load} onApplied={applyState} />
 
         <footer className="mt-auto flex flex-col gap-2 border-t border-white/8 py-4 font-mono text-[10px] tracking-widest text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            RPC {agent?.rpc ?? "https://studio-next.genlayer.com/api"} · CHAIN 61997 · GENLAYER-JS · STORAGE VARS MANDATE / SPEND_CAP / DEADLINE
+            RPC {agent?.rpc ?? "https://studio-next.genlayer.com/api"} · CHAIN 61997 · GENLAYER-JS · get_state / adjudicate
           </span>
           <span>
             LAST SYNC {agent?.fetchedAt ?? data?.fetchedAt ?? "—"} · POLL {POLL_INTERVAL_MS / 1000}s

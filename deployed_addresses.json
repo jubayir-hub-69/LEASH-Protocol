@@ -3,11 +3,11 @@
   "chainId": 61997,
   "rpc": "https://studio-next.genlayer.com/api",
   "contract": "leash.py",
-  "contractAddress": "0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F",
-  "LEASH": "0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F",
-  "leashPy": "0xF1eAC68be6E0fC866CcCb75c3656C96Cc42c859F",
+  "contractAddress": "0x9d18d260f048873B119EB2E5a3b56f493CF8398a",
+  "LEASH": "0x9d18d260f048873B119EB2E5a3b56f493CF8398a",
+  "leashPy": "0x9d18d260f048873B119EB2E5a3b56f493CF8398a",
   "deployer": "0x63dD8aD2b467c98319bea9237fAAFFd2cA769662",
-  "deployTx": "0xbb9aab16ecfb85d38b50d0c59cfdafa46912b56bc4048f547d907f9e592bff9f",
+  "deployTx": "0x4ab4ef9926ea37a54395d65fcb04d8c06d98779c1855e6f8da07bfe2526a6e5e",
   "constructorArgs": {
     "mandate": "spend at most $200 on a flight that lands before 6pm.",
     "spend_cap": 200,
@@ -15,14 +15,14 @@
   },
   "status": "FINALIZED",
   "result": 1,
-  "timestamp": "2026-09-15T11:20:08.007Z",
-  "deployedAt": "2026-09-15T11:20:08.007Z",
+  "timestamp": "2026-09-16T05:19:12.710Z",
+  "deployedAt": "2026-09-16T05:19:12.710Z",
   "features": [
-    "emergencyFreeze / appealAndUnfreeze (owner bypass of the AI jury)",
-    "time-bound mandate deadline with automatic kill switch",
-    "milestone-based spendCap unlocking (UnlockMilestone verdict)",
-    "strict destination allowlist + on-chain receipt extraction",
-    "dynamic threat score; kill switch at threatThreshold (default 10)"
+    "adjudicate() GenLayer LLM mandate jury (eq_principle.prompt_comparative)",
+    "validator-agreed verdict writes last_verdict, spend_cap, kill_switch",
+    "get_state / get_last_verdict / can_proceed view API for the dashboard",
+    "emergency_freeze / appeal_and_unfreeze owner path",
+    "dynamic threat score; kill switch at threat_threshold (default 10)"
   ],
   "genlayerStudio": {
     "network": "genlayer_studio",
@@ -48,5 +48,30 @@
       "can_proceed": true
     },
     "deployedAt": "2026-09-06T05:32:59.248Z"
+  },
+  "lastJury": {
+    "caseId": "in-mandate",
+    "txHash": "0x73fa9b46baac3b8cf0a1c7a74dc1780d85cc4a61052bf97de16dee7936de9842",
+    "status": "FINALIZED",
+    "result": 1,
+    "state": {
+      "approved_next_spend": 186,
+      "can_proceed": true,
+      "deadline": 0,
+      "frozen": false,
+      "kill_switch": false,
+      "last_action": "Book economy SFO→JFK on Flight LE-441 landing at 17:40 local. Fare $186. No extras.",
+      "last_reason": "Economy SFO-JFK flight LE-441 lands 17:40 before 6pm and costs $186 under the $200 cap.",
+      "last_receipts": "airline=LE-441; fare_usd=186; arrival_local=17:40; cabin=economy; extras=none; status=ticketed",
+      "last_spend": 186,
+      "last_verdict": "CONTINUE",
+      "mandate": "spend at most $200 on a flight that lands before 6pm.",
+      "owner": "0x63dD8aD2b467c98319bea9237fAAFFd2cA769662",
+      "spend_cap": 14,
+      "submission_count": 1,
+      "threat_score": 0,
+      "threat_threshold": 10
+    },
+    "seededAt": "2026-09-16T05:20:41.695Z"
   }
 }
