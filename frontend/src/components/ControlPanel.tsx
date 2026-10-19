@@ -16,8 +16,12 @@ export function ControlPanel({
   onApplied: (state: AgentSnapshot) => void;
 }) {
   const [refreshing, setRefreshing] = useState(false);
-  const [busy, setBusy] = useState<"freeze" | "unfreeze" | null>(null);
+  const [busy, setBusy] = useState<"freeze" | "unfreeze" | "ai_appeal" | null>(null);
   const [lastWrite, setLastWrite] = useState<JuryWriteResult | null>(null);
+  const [justification, setJustification] = useState(
+    "The previous decision was a false positive. The booked action matches the mandate and the operator requests the spend cap restored."
+  );
+  const [requestedCap, setRequestedCap] = useState("200");
   const frozen = agent?.killSwitchStatus === "ACTIVE";
   const contractAddress = agent?.contractAddress ?? FALLBACK_LEASH_ADDRESS;
 
@@ -28,6 +32,44 @@ export function ControlPanel({
       await onRefresh();
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  async function submitAppeal() {
+    if (busy) return;
+    const cap = Number(requestedCap);
+    if (!justification.trim() || !Number.isFinite(cap) || cap <= 0) {
+      setLastWrite({
+        ok: false,
+        functionName: "submit_ai_appeal",
+        error: "Enter a justification and a requested cap greater than zero.",
+      });
+      return;
+    }
+    setBusy("ai_appeal");
+    setLastWrite(null);
+    try {
+      const response = await fetch("/api/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ai_appeal",
+          justification: justification.trim(),
+          requestedCap: cap,
+        }),
+      });
+      const payload = (await response.json()) as JuryWriteResult;
+      setLastWrite(payload);
+      if (payload.ok && payload.state) onApplied(payload.state);
+    } catch (error) {
+      setLastWrite({
+        ok: false,
+        functionName: "submit_ai_appeal",
+        error: "Dashboard could not reach /api/control",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -77,16 +119,16 @@ export function ControlPanel({
               frozen ? "text-rose-400/80" : "text-emerald-400/80"
             }`}
           >
-            05 // CONTROL PANEL
+            10 // CONTROL PANEL
           </p>
           <h2 className="mt-2 font-sans text-sm font-semibold tracking-[0.22em] text-slate-100 uppercase">
             Live Intelligent Contract
           </h2>
           <p className="mt-1 max-w-2xl font-mono text-[11px] leading-relaxed text-slate-500">
-            Dashboard calls the Python contract API through genlayer-js:
-            `get_state`, `adjudicate`, `emergency_freeze`,
-            `appeal_and_unfreeze`. Schema reports {agent ? agent.methodCount : "—"}{" "}
-            public methods.
+            Dashboard calls the Python contract through genlayer-js. Schema reports{" "}
+            {agent ? agent.methodCount : "—"} public methods, including the original
+            gate plus `update_policy`, `submit_ai_appeal`, `get_telemetry`, and
+            `get_audit_history`.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 font-mono text-[10px] tracking-widest text-slate-500">
@@ -152,9 +194,57 @@ export function ControlPanel({
         </div>
         <p className="font-mono text-[11px] leading-relaxed text-slate-500">
           Reads `get_state`. Writes wait for Studio Next finality, then read the
-          mutated spend_cap / kill_switch / last_verdict back.
+          mutated spend_cap, kill_switch, and last_verdict back.
         </p>
       </div>
+
+      <form
+        className="mt-5 border border-white/8 bg-black/25 p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submitAppeal();
+        }}
+      >
+        <p className="font-mono text-[10px] tracking-[0.32em] text-cyan-400/80">
+          AI-ADJUDICATED APPEAL
+        </p>
+        <p className="mt-2 font-mono text-[11px] leading-relaxed text-slate-500">
+          `submit_ai_appeal` asks the validator jury whether to unlock the kill switch and restore the requested cap. The owner unfreeze above remains a direct restore.
+        </p>
+        <label className="mt-4 block">
+          <span className="font-mono text-[10px] tracking-[0.28em] text-slate-500">
+            JUSTIFICATION
+          </span>
+          <textarea
+            value={justification}
+            onChange={(event) => setJustification(event.target.value)}
+            rows={3}
+            className="mt-2 w-full border border-cyan-400/20 bg-black/40 px-3 py-3 font-mono text-xs leading-relaxed text-cyan-50 outline-none focus:border-cyan-300/60"
+          />
+        </label>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="block sm:w-48">
+            <span className="font-mono text-[10px] tracking-[0.28em] text-slate-500">
+              REQUESTED CAP $
+            </span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={requestedCap}
+              onChange={(event) => setRequestedCap(event.target.value)}
+              className="mt-2 w-full border border-cyan-400/20 bg-black/40 px-3 py-3 font-mono text-xs text-cyan-50 outline-none focus:border-cyan-300/60"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={Boolean(busy)}
+            className="border border-cyan-400/45 bg-cyan-500/10 px-5 py-3 text-left font-mono text-[11px] tracking-[0.18em] text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy === "ai_appeal" ? "JURY REVIEWING APPEAL…" : "SUBMIT AI APPEAL"}
+          </button>
+        </div>
+      </form>
 
       {lastWrite ? (
         <p

@@ -46,8 +46,29 @@ export function loadLeashAddress(): { address: string; source: string } {
   return { address: FALLBACK_LEASH_ADDRESS, source: "studio-next-fallback" };
 }
 
-let cachedSchema: { methods: string[]; constructorParams: string[] } | null =
-  null;
+let cachedSchema: {
+  address: string;
+  methods: string[];
+  constructorParams: string[];
+} | null = null;
+
+const FALLBACK_METHODS = [
+  "get_state",
+  "get_mandate",
+  "get_spend_cap",
+  "get_deadline",
+  "get_last_verdict",
+  "get_last_reason",
+  "get_kill_switch",
+  "can_proceed",
+  "get_telemetry",
+  "get_audit_history",
+  "adjudicate",
+  "update_policy",
+  "emergency_freeze",
+  "appeal_and_unfreeze",
+  "submit_ai_appeal",
+];
 
 function snapshotFromState(
   state: LeashOnChainState,
@@ -99,6 +120,14 @@ function snapshotFromState(
     threatScore: state.threatScore.toString(),
     threatThreshold: state.threatThreshold.toString(),
     submissionCount: state.submissionCount.toString(),
+    lastRiskScore: Number(state.lastRiskScore),
+    lastThreatCategory: state.lastThreatCategory || "NONE",
+    totalAdjudications: state.totalAdjudications.toString(),
+    totalBlockedVolume: state.totalBlockedVolume.toString(),
+    totalBlockedVolumeUsd: formatUsd(state.totalBlockedVolume),
+    promptInjectionsBlocked: state.promptInjectionsBlocked.toString(),
+    threatsNeutralized: state.threatsNeutralized.toString(),
+    auditHistory: state.auditHistory,
     owner: state.owner,
     constructorParams: schema.constructorParams,
     methodCount: schema.methods.length,
@@ -117,18 +146,17 @@ export async function fetchAgentSnapshot(): Promise<AgentResponse> {
     const contractAddress = address as HexAddress;
     const state = await readLeashState(client, contractAddress);
 
-    if (!cachedSchema) {
+    if (
+      !cachedSchema ||
+      cachedSchema.address.toLowerCase() !== contractAddress.toLowerCase()
+    ) {
       try {
-        cachedSchema = await readLeashSchema(client, contractAddress);
+        const schema = await readLeashSchema(client, contractAddress);
+        cachedSchema = { address: contractAddress, ...schema };
       } catch {
         cachedSchema = {
-          methods: [
-            "get_state",
-            "get_mandate",
-            "adjudicate",
-            "emergency_freeze",
-            "appeal_and_unfreeze",
-          ],
+          address: contractAddress,
+          methods: FALLBACK_METHODS,
           constructorParams: ["mandate", "spend_cap", "deadline"],
         };
       }
@@ -157,7 +185,12 @@ export async function fetchAgentSnapshot(): Promise<AgentResponse> {
 }
 
 export async function submitLeashWrite(args: {
-  functionName: "adjudicate" | "emergency_freeze" | "appeal_and_unfreeze";
+  functionName:
+    | "adjudicate"
+    | "emergency_freeze"
+    | "appeal_and_unfreeze"
+    | "update_policy"
+    | "submit_ai_appeal";
   callArgs: Array<string | number | boolean>;
 }): Promise<JuryWriteResult> {
   const { address, source } = loadLeashAddress();
@@ -169,11 +202,19 @@ export async function submitLeashWrite(args: {
       callArgs: args.callArgs,
     });
     const state = await readLeashState(client, address as HexAddress);
-    if (!cachedSchema) {
+    if (
+      !cachedSchema ||
+      cachedSchema.address.toLowerCase() !== address.toLowerCase()
+    ) {
       try {
-        cachedSchema = await readLeashSchema(client, address as HexAddress);
+        const schema = await readLeashSchema(client, address as HexAddress);
+        cachedSchema = { address, ...schema };
       } catch {
-        cachedSchema = { methods: [], constructorParams: [] };
+        cachedSchema = {
+          address,
+          methods: FALLBACK_METHODS,
+          constructorParams: ["mandate", "spend_cap", "deadline"],
+        };
       }
     }
     return {

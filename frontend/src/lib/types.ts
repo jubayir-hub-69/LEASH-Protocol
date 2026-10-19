@@ -1,5 +1,21 @@
 export type KillSwitchStatus = "ACTIVE" | "DISABLED";
 
+export type AuditEntry = {
+  id: number;
+  kind: string;
+  action: string;
+  receipts: string;
+  spend: string;
+  verdict: string;
+  reason: string;
+  riskScore: number;
+  threatCategory: string;
+  spendCapAfter: string;
+  killSwitch: boolean;
+  blockedVolume: string;
+  timestamp: string;
+};
+
 export type AgentSnapshot = {
   ok: true;
   connected: true;
@@ -28,6 +44,14 @@ export type AgentSnapshot = {
   threatScore: string;
   threatThreshold: string;
   submissionCount: string;
+  lastRiskScore: number;
+  lastThreatCategory: string;
+  totalAdjudications: string;
+  totalBlockedVolume: string;
+  totalBlockedVolumeUsd: string;
+  promptInjectionsBlocked: string;
+  threatsNeutralized: string;
+  auditHistory: AuditEntry[];
   owner: string;
   constructorParams: string[];
   methodCount: number;

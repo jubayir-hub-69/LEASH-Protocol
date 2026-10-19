@@ -12,6 +12,7 @@
     "deploy:studio-next": "hardhat run scripts/deploy.js --network studio_next",
     "deploy:studio-py": "node scripts/deploy_leash_py.mjs",
     "jury:seed": "node scripts/adjudicate.mjs",
+    "verify:v1": "node scripts/verify_v1.mjs",
     "studio:1": "hardhat run studio_cases/1_in_mandate.js --network genlayer_studio",
     "studio:2": "hardhat run studio_cases/2_soft_drift.js --network genlayer_studio",
     "studio:3": "hardhat run studio_cases/3_overspend.js --network genlayer_studio",

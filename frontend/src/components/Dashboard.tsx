@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AuditLog } from "./AuditLog";
 import { ControlPanel } from "./ControlPanel";
 import { Header } from "./Header";
 import { JuryPanel } from "./JuryPanel";
@@ -97,13 +98,14 @@ export function Dashboard() {
         {data && !data.ok ? <ErrorBanner data={data} /> : null}
 
         <StatusCards agent={agent} />
-        <MandatePanel agent={agent} />
+        <MandatePanel agent={agent} onApplied={applyState} />
         <JuryPanel agent={agent} onApplied={applyState} />
         <ControlPanel agent={agent} onRefresh={load} onApplied={applyState} />
+        <AuditLog agent={agent} onApplied={applyState} />
 
         <footer className="mt-auto flex flex-col gap-2 border-t border-white/8 py-4 font-mono text-[10px] tracking-widest text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            RPC {agent?.rpc ?? "https://studio-next.genlayer.com/api"} · CHAIN 61997 · GENLAYER-JS · get_state / adjudicate
+            RPC {agent?.rpc ?? "https://studio-next.genlayer.com/api"} · CHAIN 61997 · PROTOCOL V1.0 · get_state / adjudicate / update_policy
           </span>
           <span>
             LAST SYNC {agent?.fetchedAt ?? data?.fetchedAt ?? "—"} · POLL {POLL_INTERVAL_MS / 1000}s

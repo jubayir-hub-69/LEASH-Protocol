@@ -340,11 +340,12 @@ async function deployStudioNextIntelligentContract() {
     timestamp,
     deployedAt: timestamp,
     features: [
-      "adjudicate() GenLayer LLM mandate jury (eq_principle.prompt_comparative)",
-      "validator-agreed verdict writes last_verdict, spend_cap, kill_switch",
-      "get_state / get_last_verdict / can_proceed view API for the dashboard",
+      "LEASH Protocol v1.0 graduated jury: CONTINUE, THROTTLE, REVOKE",
+      "adjudicate() prompt-injection detection, risk_score, and threat_category",
+      "update_policy() live mandate, spend cap, and deadline",
+      "submit_ai_appeal() validator appeal jury",
+      "get_audit_history() and get_telemetry() included in get_state()",
       "emergency_freeze / appeal_and_unfreeze owner path",
-      "dynamic threat score; kill switch at threat_threshold (default 10)",
     ],
   };
   if (existing.genlayerStudio) {

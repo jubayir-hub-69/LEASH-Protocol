@@ -13,8 +13,14 @@ export function StatusCards({ agent }: { agent: AgentSnapshot | null }) {
       : formatCountdown(agent.deadline)
     : "—";
 
+  const risk = agent ? agent.lastRiskScore : null;
+  const category = agent?.lastThreatCategory || "NONE";
+  const riskTone = riskToneFor(risk);
+  const categoryTone = categoryToneFor(category);
+
   return (
-    <section className="grid gap-4 md:grid-cols-3">
+    <div className="flex flex-col gap-4">
+    <section className="grid min-w-0 gap-4 md:grid-cols-3">
       <StatusCard
         tone={killActive || spend === "$0.00" ? "red" : "green"}
         kicker="01"
@@ -69,6 +75,146 @@ export function StatusCards({ agent }: { agent: AgentSnapshot | null }) {
         <SwitchGlyph active={killActive} />
       </StatusCard>
     </section>
+
+    <section className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <StatusCard
+        tone={riskTone}
+        kicker="04"
+        title="Risk Score"
+        value={risk == null ? "—" : `${risk}`}
+        hint="On-chain last_risk_score from the validator jury, 0 to 100"
+        footer={
+          agent
+            ? `Adjudications ${agent.totalAdjudications} · submissions ${agent.submissionCount}`
+            : "Awaiting chain state"
+        }
+      >
+        <RiskMeter score={risk ?? 0} empty={risk == null} />
+      </StatusCard>
+
+      <StatusCard
+        tone={categoryTone}
+        kicker="05"
+        title="Threat Category"
+        value={agent ? category : "—"}
+        hint="On-chain last_threat_category written by adjudicate()"
+        footer={
+          agent
+            ? category === "NONE"
+              ? "No active threat category on the last decision"
+              : `Last verdict ${agent.lastVerdict}`
+            : "Awaiting chain state"
+        }
+      >
+        <CategoryBadge category={agent ? category : "NONE"} />
+      </StatusCard>
+
+      <StatusCard
+        tone={agent && agent.totalBlockedVolume !== "0" ? "amber" : "green"}
+        kicker="06"
+        title="Total Blocked Volume"
+        value={agent?.totalBlockedVolumeUsd ?? "—"}
+        hint="On-chain total_blocked_volume denied by THROTTLE and REVOKE"
+        footer={
+          agent
+            ? `Raw total_blocked_volume ${agent.totalBlockedVolume}`
+            : "Awaiting chain state"
+        }
+      >
+        <CapBar empty={!agent || agent.totalBlockedVolume === "0"} />
+      </StatusCard>
+
+      <StatusCard
+        tone={agent && agent.threatsNeutralized !== "0" ? "red" : "green"}
+        kicker="07"
+        title="Neutralized Threats"
+        value={agent?.threatsNeutralized ?? "—"}
+        hint="On-chain threats_neutralized across throttle and revoke decisions"
+        footer={
+          agent
+            ? `${agent.promptInjectionsBlocked} prompt injections blocked`
+            : "Awaiting chain state"
+        }
+      >
+        <ThreatTicks count={Number(agent?.promptInjectionsBlocked ?? 0)} />
+      </StatusCard>
+    </section>
+    </div>
+  );
+}
+
+function SensorValue({ value, className }: { value: string; className: string }) {
+  const long = value.length > 12 || value.includes("_");
+  const size = long
+    ? "text-lg leading-tight tracking-tight sm:text-xl xl:text-2xl"
+    : "text-3xl tracking-wide sm:text-4xl";
+  const parts = value.split("_");
+  return (
+    <p className={`mt-4 max-w-full font-sans font-bold break-words [overflow-wrap:anywhere] ${size} ${className}`}>
+      {parts.map((part, index) => (
+        <span key={`${part}-${index}`}>
+          {part}
+          {index < parts.length - 1 ? (
+            <>
+              _
+              <wbr />
+            </>
+          ) : null}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+function riskToneFor(score: number | null): "green" | "red" | "amber" {
+  if (score == null) return "green";
+  if (score >= 70) return "red";
+  if (score >= 35) return "amber";
+  return "green";
+}
+
+function categoryToneFor(category: string): "green" | "red" | "amber" {
+  if (category === "PROMPT_INJECTION" || category === "OVERSPEND") return "red";
+  if (category === "POLICY_DRIFT" || category === "DEADLINE_VIOLATION") return "amber";
+  return "green";
+}
+
+function RiskMeter({ score, empty }: { score: number; empty: boolean }) {
+  const clamped = Math.max(0, Math.min(100, score));
+  const color =
+    clamped >= 70 ? "bg-rose-500 shadow-[0_0_12px_#ff2d55]" : clamped >= 35 ? "bg-amber-400 shadow-[0_0_12px_#f5b942]" : "bg-emerald-400 shadow-[0_0_12px_#00ff9c]";
+  return (
+    <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+      <div className={`h-full ${empty ? "w-0" : color}`} style={empty ? undefined : { width: `${clamped}%` }} />
+    </div>
+  );
+}
+
+function CategoryBadge({ category }: { category: string }) {
+  const tone =
+    category === "PROMPT_INJECTION" || category === "OVERSPEND"
+      ? "border-rose-400/50 bg-rose-500/10 text-rose-200"
+      : category === "POLICY_DRIFT" || category === "DEADLINE_VIOLATION"
+        ? "border-amber-400/50 bg-amber-500/10 text-amber-200"
+        : "border-emerald-400/40 bg-emerald-400/10 text-emerald-200";
+  return (
+    <span className={`inline-block max-w-full border px-3 py-1 font-mono text-[10px] tracking-[0.14em] break-all ${tone}`}>
+      {category}
+    </span>
+  );
+}
+
+function ThreatTicks({ count }: { count: number }) {
+  const filled = Math.max(0, Math.min(8, count));
+  return (
+    <div className="flex gap-1">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <span
+          key={index}
+          className={`h-2 flex-1 ${index < filled ? "bg-rose-400 shadow-[0_0_8px_#ff2d55]" : "bg-white/10"}`}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -115,22 +261,20 @@ function StatusCard({
   return (
     <Frame
       tone={tone}
-      className={`h-full border ${palette.border} ${palette.glow} bg-[#070d14]/85 p-5 backdrop-blur-md ${
+      className={`h-full min-w-0 border ${palette.border} ${palette.glow} bg-[#070d14]/85 p-5 backdrop-blur-md ${
         pulse ? "animate-kill-pulse" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <p className={`font-mono text-[10px] tracking-[0.35em] ${palette.kicker}`}>
-          {kicker} // SENSOR
+          {`${kicker} // SENSOR`}
         </p>
         <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
       </div>
       <h2 className="mt-3 font-sans text-sm font-semibold tracking-[0.18em] text-slate-200 uppercase">
         {title}
       </h2>
-      <p className={`mt-4 font-sans text-3xl font-bold tracking-wide sm:text-4xl ${palette.value}`}>
-        {value}
-      </p>
+      <SensorValue value={value} className={palette.value} />
       <p className="mt-2 font-mono text-[11px] leading-relaxed text-slate-500">{hint}</p>
       <div className="mt-5">{children}</div>
       <p className="mt-4 border-t border-white/6 pt-3 font-mono text-[10px] leading-relaxed tracking-wide text-slate-500">

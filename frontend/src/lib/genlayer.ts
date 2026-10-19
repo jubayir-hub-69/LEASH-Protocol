@@ -9,6 +9,7 @@ import {
   JURY_WAIT_RETRIES,
   STUDIO_NEXT_RPC,
 } from "./config";
+import type { AuditEntry } from "./types";
 
 export type HexAddress = `0x${string}`;
 
@@ -31,6 +32,13 @@ export type LeashOnChainState = {
   threatThreshold: bigint;
   submissionCount: bigint;
   canProceed: boolean;
+  lastRiskScore: bigint;
+  lastThreatCategory: string;
+  totalAdjudications: bigint;
+  totalBlockedVolume: bigint;
+  promptInjectionsBlocked: bigint;
+  threatsNeutralized: bigint;
+  auditHistory: AuditEntry[];
 };
 
 function studioNextChain() {
@@ -154,6 +162,71 @@ function asBool(value: unknown): boolean {
   return false;
 }
 
+function auditRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) return null;
+    try {
+      return auditRecord(JSON.parse(text));
+    } catch {
+      return null;
+    }
+  }
+  if (value instanceof Map) {
+    return Object.fromEntries(value.entries());
+  }
+  if (Array.isArray(value)) {
+    const rec: Record<string, unknown> = {};
+    for (const entry of value) {
+      if (Array.isArray(entry) && entry.length >= 2) {
+        rec[String(entry[0])] = entry[1];
+      }
+    }
+    return Object.keys(rec).length ? rec : null;
+  }
+  if (value && typeof value === "object") {
+    return value as Record<string, unknown>;
+  }
+  return null;
+}
+
+export function parseAuditHistory(value: unknown): AuditEntry[] {
+  let source = value;
+  if (typeof source === "string") {
+    const text = source.trim();
+    if (!text) return [];
+    try {
+      source = JSON.parse(text);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(source)) return [];
+
+  const rows: AuditEntry[] = [];
+  source.forEach((item, index) => {
+    const rec = auditRecord(item);
+    if (!rec) return;
+    const risk = Number(asBigInt(rec.risk_score));
+    rows.push({
+      id: Number(asBigInt(rec.id, BigInt(index + 1))),
+      kind: asString(rec.kind, "ADJUDICATION"),
+      action: asString(rec.action),
+      receipts: asString(rec.receipts),
+      spend: asBigInt(rec.spend).toString(),
+      verdict: asString(rec.verdict, "NONE"),
+      reason: asString(rec.reason),
+      riskScore: Number.isFinite(risk) ? risk : 0,
+      threatCategory: asString(rec.threat_category, "NONE"),
+      spendCapAfter: asBigInt(rec.spend_cap_after).toString(),
+      killSwitch: asBool(rec.kill_switch),
+      blockedVolume: asBigInt(rec.blocked_volume).toString(),
+      timestamp: asString(rec.timestamp),
+    });
+  });
+  return rows;
+}
+
 export function parseLeashState(value: unknown): LeashOnChainState {
   const rec = asRecord(value);
   if (!rec.mandate && rec.mandate !== "") {
@@ -176,6 +249,13 @@ export function parseLeashState(value: unknown): LeashOnChainState {
     threatThreshold: asBigInt(rec.threat_threshold, BigInt(10)),
     submissionCount: asBigInt(rec.submission_count),
     canProceed: asBool(rec.can_proceed),
+    lastRiskScore: asBigInt(rec.last_risk_score),
+    lastThreatCategory: asString(rec.last_threat_category, "NONE"),
+    totalAdjudications: asBigInt(rec.total_adjudications),
+    totalBlockedVolume: asBigInt(rec.total_blocked_volume),
+    promptInjectionsBlocked: asBigInt(rec.prompt_injections_blocked),
+    threatsNeutralized: asBigInt(rec.threats_neutralized),
+    auditHistory: parseAuditHistory(rec.audit_history),
   };
 }
 
